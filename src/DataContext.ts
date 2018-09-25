@@ -34,6 +34,10 @@ namespace Bowtie {
             }
             return this._parent.root;
         }
+
+        getContext(element: Element, map:string):DataContext {
+            
+        }
     }
 
 }
