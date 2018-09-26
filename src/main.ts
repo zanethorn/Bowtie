@@ -9,7 +9,7 @@ namespace Bowtie {
             context = context.getContext(element, contextAttr);
         }
 
-        let attributeNames = element.getAttributeNames();
+        let attributeNames = [];//element.getAttributeNames();
 
         for (let name of attributeNames) {
             if (name.startsWith("data-bind-")) {
@@ -25,11 +25,11 @@ namespace Bowtie {
         }
     }
 
-    export function binders():Array<Binder>{
+    export function binders(): Array<Binder> {
         return _binders.slice();
     }
 
-    
+
 
     export function tie(data: any): void {
         let observableData = new Observable(data);

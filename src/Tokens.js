@@ -1,25 +1,22 @@
-namespace Bowtie {
-
-    enum CharacterType {
-        None = 0,
-
-        Letter = 1,
-        Number = 2,
-
-        WhiteSpace = 3,
-        Period = 4,
-        OpenParen = 5,
-        CloseParen = 6,
-        OpenBracket = 7,
-        CloseBracket = 8,
-        Comma = 9,
-        Quote = 10,
-        DoubleQuote = 11,
-        Operator = 12,
-
-    }
-
-    const CHARACTER_MAP: any = {
+var Bowtie;
+(function (Bowtie) {
+    let CharacterType;
+    (function (CharacterType) {
+        CharacterType[CharacterType["None"] = 0] = "None";
+        CharacterType[CharacterType["Letter"] = 1] = "Letter";
+        CharacterType[CharacterType["Number"] = 2] = "Number";
+        CharacterType[CharacterType["WhiteSpace"] = 3] = "WhiteSpace";
+        CharacterType[CharacterType["Period"] = 4] = "Period";
+        CharacterType[CharacterType["OpenParen"] = 5] = "OpenParen";
+        CharacterType[CharacterType["CloseParen"] = 6] = "CloseParen";
+        CharacterType[CharacterType["OpenBracket"] = 7] = "OpenBracket";
+        CharacterType[CharacterType["CloseBracket"] = 8] = "CloseBracket";
+        CharacterType[CharacterType["Comma"] = 9] = "Comma";
+        CharacterType[CharacterType["Quote"] = 10] = "Quote";
+        CharacterType[CharacterType["DoubleQuote"] = 11] = "DoubleQuote";
+        CharacterType[CharacterType["Operator"] = 12] = "Operator";
+    })(CharacterType || (CharacterType = {}));
+    const CHARACTER_MAP = {
         "a": CharacterType.Letter,
         "b": CharacterType.Letter,
         "c": CharacterType.Letter,
@@ -102,35 +99,30 @@ namespace Bowtie {
         "&": CharacterType.Operator,
         "|": CharacterType.Operator,
         "!": CharacterType.Operator,
+    };
+    class Token {
+        constructor(type) {
+            this.type = type;
+        }
     }
-
-    export class Token {
-        constructor(readonly type: CharacterType) { }
-    }
-
-    export class TokenParser {
-
-        static parse(value: string): Token {
-
+    Bowtie.Token = Token;
+    class TokenParser {
+        static parse(value) {
             let tokenStart = 0;
             let ix = 0;
             let lastCharType = CharacterType.None;
-            let firstToken: Token = null;
-            let lastToken: Token = null;
-
+            let firstToken = null;
+            let lastToken = null;
             while (ix < value.length) {
                 let char = value[ix];
-                let charType: CharacterType = CHARACTER_MAP[char];
-
+                let charType = CHARACTER_MAP[char];
                 if (charType == undefined) {
                     throw new Error(`Unknown Character '${char}' found in parse string at index ${ix}`);
                 }
-
             }
-
             return firstToken;
         }
-
     }
-
-}
+    Bowtie.TokenParser = TokenParser;
+})(Bowtie || (Bowtie = {}));
+//# sourceMappingURL=Tokens.js.map

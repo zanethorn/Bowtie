@@ -1,5 +1,139 @@
-var Bowtie;
-(function (Bowtie) {
+let Bowtie = (function (Bowtie) {
+
+    /* Global Constants */
+    const CHARACTER_TYPES = {
+
+    };
+
+    const CHARACTER_MAP = {
+        "a": CharacterType.Letter,
+        "b": CharacterType.Letter,
+        "c": CharacterType.Letter,
+        "d": CharacterType.Letter,
+        "e": CharacterType.Letter,
+        "f": CharacterType.Letter,
+        "g": CharacterType.Letter,
+        "h": CharacterType.Letter,
+        "i": CharacterType.Letter,
+        "j": CharacterType.Letter,
+        "k": CharacterType.Letter,
+        "l": CharacterType.Letter,
+        "m": CharacterType.Letter,
+        "n": CharacterType.Letter,
+        "o": CharacterType.Letter,
+        "p": CharacterType.Letter,
+        "q": CharacterType.Letter,
+        "r": CharacterType.Letter,
+        "s": CharacterType.Letter,
+        "t": CharacterType.Letter,
+        "u": CharacterType.Letter,
+        "v": CharacterType.Letter,
+        "w": CharacterType.Letter,
+        "x": CharacterType.Letter,
+        "y": CharacterType.Letter,
+        "z": CharacterType.Letter,
+        "A": CharacterType.Letter,
+        "B": CharacterType.Letter,
+        "C": CharacterType.Letter,
+        "D": CharacterType.Letter,
+        "E": CharacterType.Letter,
+        "F": CharacterType.Letter,
+        "G": CharacterType.Letter,
+        "H": CharacterType.Letter,
+        "I": CharacterType.Letter,
+        "J": CharacterType.Letter,
+        "K": CharacterType.Letter,
+        "L": CharacterType.Letter,
+        "M": CharacterType.Letter,
+        "N": CharacterType.Letter,
+        "O": CharacterType.Letter,
+        "P": CharacterType.Letter,
+        "Q": CharacterType.Letter,
+        "R": CharacterType.Letter,
+        "S": CharacterType.Letter,
+        "T": CharacterType.Letter,
+        "U": CharacterType.Letter,
+        "V": CharacterType.Letter,
+        "W": CharacterType.Letter,
+        "X": CharacterType.Letter,
+        "Y": CharacterType.Letter,
+        "Z": CharacterType.Letter,
+        "1": CharacterType.Number,
+        "2": CharacterType.Number,
+        "3": CharacterType.Number,
+        "4": CharacterType.Number,
+        "5": CharacterType.Number,
+        "6": CharacterType.Number,
+        "7": CharacterType.Number,
+        "8": CharacterType.Number,
+        "9": CharacterType.Number,
+        "0": CharacterType.Number,
+        " ": CharacterType.WhiteSpace,
+        "\t": CharacterType.WhiteSpace,
+        "\n": CharacterType.WhiteSpace,
+        "\r": CharacterType.WhiteSpace,
+        ".": CharacterType.Period,
+        "(": CharacterType.OpenParen,
+        ")": CharacterType.CloseParen,
+        "[": CharacterType.OpenBracket,
+        "]": CharacterType.CloseBracket,
+        ",": CharacterType.Comma,
+        "'": CharacterType.Quote,
+        "\"": CharacterType.DoubleQuote,
+        "-": CharacterType.Operator,
+        "+": CharacterType.Operator,
+        "/": CharacterType.Operator,
+        "*": CharacterType.Operator,
+        "^": CharacterType.Operator,
+        "&": CharacterType.Operator,
+        "|": CharacterType.Operator,
+        "!": CharacterType.Operator,
+    };
+
+    /* Global Private Fields */
+    let _binders = new Array();
+
+
+    /* Global Private Functions */
+
+    /**
+     * Parses a string into a chain of tokens
+     * @param {} input 
+     */
+    function _parseTokenString(input) {
+
+    }
+
+    function _bindInternal(context, element) {
+        let contextAttr = element.getAttribute("data-context");
+        if (contextAttr) {
+            context = context.getContext(element, contextAttr);
+        }
+        let attributeNames = [];
+        for (let name of attributeNames) {
+            if (name.startsWith("data-bind-")) {
+                var value = element.getAttribute(name);
+            }
+        }
+        for (let child of element.childNodes) {
+            if (child instanceof Element) {
+                _bindInternal(context, child);
+            }
+        }
+    }
+
+    /* Private Classes */
+
+    /**
+     * Represents 
+     */
+    class Token {
+        constructor(type, value) {
+            this.type = type;
+            this.value = value;
+            this.next = null;
+        }
+    }
     class DataContext {
         constructor(data, element, token, parent) {
             if (!parent) {
@@ -49,10 +183,31 @@ var Bowtie;
             return ctx;
         }
     }
-    Bowtie.DataContext = DataContext;
-})(Bowtie || (Bowtie = {}));
-var Bowtie;
-(function (Bowtie) {
+
+    /* Public Functions */
+
+    /**
+     *  Returns the list of currently registered binders
+     */
+    function binders() {
+        return _binders.slice();
+    }
+
+    /** 
+     * Main Entry point.  Binds data to the HTML
+     */
+    function tie(data) {
+        let observableData = new Bowtie.Observable(data);
+        let body = document.body;
+        let context = new Bowtie.DataContext(observableData, body, null);
+        bindInternal(context, body);
+    }
+
+    /* Public Classes */
+
+    /** 
+     *  Represents an object that notifies when data has been changed.
+     */
     class Observable {
         constructor(state) {
             this._eventListeners = {};
@@ -111,34 +266,11 @@ var Bowtie;
                 }
             }
         }
-    }
+    } /* class Observable */
+
+    /* Export Public Bowtie Properties */
+    Bowtie.binders = binders;
+    Bowtie.tie = tie;
+
     Bowtie.Observable = Observable;
 })(Bowtie || (Bowtie = {}));
-var Bowtie;
-(function (Bowtie) {
-    function bindInternal(context, element) {
-        let contextAttr = element.getAttribute("data-context");
-        if (contextAttr) {
-            context = context.getContext(element, contextAttr);
-        }
-        let attributeNames = element.getAttributeNames();
-        for (let name of attributeNames) {
-            if (name.startsWith("data-bind-")) {
-                var value = element.getAttribute(name);
-            }
-        }
-        for (let child of element.childNodes) {
-            if (child instanceof Element) {
-                bindInternal(context, child);
-            }
-        }
-    }
-    function tie(data) {
-        let observableData = new Bowtie.Observable(data);
-        let body = document.body;
-        let context = new Bowtie.DataContext(observableData, body, null);
-        bindInternal(context, body);
-    }
-    Bowtie.tie = tie;
-})(Bowtie || (Bowtie = {}));
-//# sourceMappingURL=bowtie.js.map
