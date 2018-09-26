@@ -49,9 +49,11 @@ namespace Bowtie {
             let segments = path.split(".");
             let token = segments[0];
             let remainder = null;
+            
             if (segments.length > 1) {
                 remainder = segments.slice(1).join(".");
             }
+
             if (token === ""){
                 return this.root.getContext(element, remainder);
             }

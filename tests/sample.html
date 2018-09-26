@@ -1,0 +1,21 @@
+<html>
+
+<body>
+    <div>
+        <span>Name:</span>
+        <input type="text" data-bind-value="name" />
+
+    </div>
+
+
+    <script type="text/javascript" src="../bowtie.js"></script>
+    <script type="text/javascript">
+        let data = {
+            "name": "This named control"
+        }
+
+        document.addEventListener("DOMContentLoaded", () => Bowtie.tie(data));
+    </script>
+</body>
+
+</html>

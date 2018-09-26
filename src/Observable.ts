@@ -2,7 +2,7 @@ namespace Bowtie {
 
     export class Observable implements EventTarget {
         private _state: any;
-        private _eventListeners = {};
+        private _eventListeners: any = {};
 
         constructor(state?: any) {
             if (state instanceof Observable) {
@@ -20,24 +20,57 @@ namespace Bowtie {
             return this._state;
         }
 
-        onchanged: EventHandler;
+        getValue(key: string): any {
+            return this._state[key];
+        }
 
-        change(key: string, value: any): void {
-            let existing = this._state[key];
-            if (existing !== value) {
+        setValue(key: string, value: any): void {
+            if (this._state[key] !== value) {
+                let previousValue = this._state[key];
                 this._state[key] = value;
-                this.onchanged();
+                this.dispatchEvent(
+                    new CustomEvent(
+                        "changed",
+                        {
+                            detail: {
+                                propertyName: key,
+                                previousValue: previousValue,
+                                newValue: value
+                            }
+                        }
+                    )
+                );
             }
         }
 
         addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
-            throw new Error("Method not implemented.");
+            if (!(type in this._eventListeners)) {
+                this._eventListeners[type] = [];
+            }
+            this._eventListeners[type].push(listener);
         }
         dispatchEvent(evt: Event): boolean {
-            throw new Error("Method not implemented.");
+            if (!(event.type in this._eventListeners)) {
+                return true;
+            }
+            var stack = this._eventListeners[event.type].slice();
+
+            for (var i = 0, l = stack.length; i < l; i++) {
+                stack[i].call(this, event);
+            }
+            return !event.defaultPrevented;
         }
         removeEventListener(type: string, listener?: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
-            throw new Error("Method not implemented.");
+            if (!(type in this._eventListeners)) {
+                return;
+            }
+            var stack = this._eventListeners[type];
+            for (var i = 0, l = stack.length; i < l; i++) {
+                if (stack[i] === listener) {
+                    stack.splice(i, 1);
+                    return;
+                }
+            }
         }
 
     }
