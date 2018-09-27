@@ -1,3 +1,6 @@
+var window = (window || {});
+var module = (module || undefined);
+
 let Bowtie;
 (function (Bowtie) {
 
@@ -120,38 +123,15 @@ let Bowtie;
 
     }
 
-    /* Global Private Fields */
+    /* Public Classes */
 
-
-    /* Global Private Functions */
-
-
-
-    function _bindInternal(context, element) {
-        let contextAttr = element.getAttribute("data-context");
-        if (contextAttr) {
-            context = context.getContext(element, contextAttr);
-        }
-        let attributeNames = [];
-        for (let name of attributeNames) {
-            if (name.startsWith("data-bind-")) {
-                var value = element.getAttribute(name);
-            }
-        }
-        for (let child of element.childNodes) {
-            if (child instanceof Element) {
-                _bindInternal(context, child);
-            }
-        }
-    }
-
-    /* Private Classes */
     class Binder {
-        constructor(type) {
+        constructor(type, value) {
             this._type = type;
+            this._value = value;
         }
 
-        bind(element, attribute) {
+        bind(source, target, targetAttribute) {
             throw Error("Binding Error: Method is Abstract.");
         }
 
@@ -166,27 +146,68 @@ let Bowtie;
         get type() {
             return this._type;
         }
-    }
-
-    class LiteralBinder extends Binder {
-        constructor(value) {
-            super(BINDER_TYPES.LITERAL);
-            this._value = value;
-        }
-
-        bind(element, attribute) {
-            element.setAttribute(attribute.value);
-        }
 
         get value() {
             return this._value;
         }
     }
 
+    class LiteralBinder extends Binder {
+        constructor(value) {
+            super(BINDER_TYPES.LITERAL, value);
+        }
+
+        bind(source, target, targetAttribute) {
+            target.setAttribute(targetAttribute, this.value);
+        }
+    }
+
+    class LookupBinder extends Binder {
+        constructor(value) {
+            super(BINDER_TYPES.LOOKUP, value);
+            this._isTwoWay = true;
+        }
+
+        get isTwoWay() {
+            return this._isTwoWay;
+        }
+
+        get isDynamic() {
+            return true;
+        }
+
+        bind(source, target, targetAttribute) {
+            source.addEventListener("changed", (ev) => {
+                target.setAttribute(targetAttribute, source.getAttribute(this.value))
+            });
+
+            if (target instanceof Observable) {
+                target.addEventListener("changed", (ev) => {
+                    source.setAttribute(this.value, target.getAttribute(targetAttribute));
+                });
+            }
+            else if (window.MutationObserver !== undefined) {
+                let targetObserver = new window.MutationObserver((mutations) => {
+                    for (let mutation of mutations) {
+                        if (mutation.type === 'attributes' && mutation.attributeName === targetAttribute) {
+                            source.setAttribute(this.value, target.getAttribute(targetAttribute));
+                        }
+                    }
+                });
+                targetObserver.observe(target, { attributes: true });
+            }
+            else {
+                this._isTwoWay = false;
+            }
+
+            target.setAttribute(targetAttribute, source.getAttribute(this.value))
+        }
+    }
+
     /**
-     * Represents 
+     * Represents a completely parsed segment of an attribute binder
      */
-    class Token {
+    class Word {
         constructor(type, value) {
             this.type = type;
             this.value = value;
@@ -194,8 +215,73 @@ let Bowtie;
             this.prev = null;
         }
     }
-    class DataContext {
-        constructor(data, element, token, parent) {
+
+    /** 
+     *  Represents an object that notifies when data has been changed.
+     */
+    class Observable {
+        constructor(state) {
+            if (!state) {
+                state = {};
+            }
+
+            if (state instanceof Observable) {
+                return state;
+            }
+
+            this._eventListeners = {};
+            this._state = state;
+        }
+        get state() {
+            return this._state;
+        }
+        getAttribute(key) {
+            return this._state[key];
+        }
+        setAttribute(key, value) {
+            if (this._state[key] !== value) {
+                let previousValue = this._state[key];
+                this._state[key] = value;
+                this.dispatchEvent({
+                    type: "changed",
+                    propertyName: key,
+                    previousValue: previousValue,
+                    newValue: value
+                });
+            }
+        }
+        addEventListener(type, listener, options) {
+            if (!(type in this._eventListeners)) {
+                this._eventListeners[type] = [];
+            }
+            this._eventListeners[type].push(listener);
+        }
+        dispatchEvent(event) {
+            if (!(event.type in this._eventListeners)) {
+                return true;
+            }
+            var stack = this._eventListeners[event.type].slice();
+            for (var i = 0, l = stack.length; i < l; i++) {
+                stack[i].call(this, event);
+            }
+            return !event.defaultPrevented;
+        }
+        removeEventListener(type, listener, options) {
+            if (!(type in this._eventListeners)) {
+                return;
+            }
+            var stack = this._eventListeners[type];
+            for (var i = 0, l = stack.length; i < l; i++) {
+                if (stack[i] === listener) {
+                    stack.splice(i, 1);
+                    return;
+                }
+            }
+        }
+    } /* class Observable */
+
+    class DataContext extends Observable {
+        constructor(data, element, parent) {
             if (!parent) {
                 parent = this;
             }
@@ -204,45 +290,25 @@ let Bowtie;
             this._parent = parent;
             this._token = token;
         }
-        get data() {
-            return this._data;
-        }
         get element() {
             return this._element;
         }
         get parent() {
             return this._parent;
         }
-        get token() {
-            return this._token;
-        }
+
         get root() {
             if (this._parent === this) {
                 return this;
             }
             return this._parent.root;
         }
-        getContext(element, path) {
-            if (!path) {
-                return this;
-            }
-            let segments = path.split(".");
-            let token = segments[0];
-            let remainder = null;
-            if (segments.length > 1) {
-                remainder = segments.slice(1).join(".");
-            }
-            if (token === "") {
-                return this.root.getContext(element, remainder);
-            }
-            let data = new Bowtie.Observable(this.data.getValue(token));
-            let ctx = new DataContext(data, element, token, this);
-            if (remainder) {
-                return ctx.getContext(element, remainder);
-            }
-            return ctx;
-        }
     }
+
+    /* Global Private Functions */
+
+
+
 
     /* Public Functions */
 
@@ -251,47 +317,47 @@ let Bowtie;
      * @param {} input 
      */
     function parseTokenString(input) {
-        let tokenStart = 0;
+        let tokenWord = 0;
         let ix = 0;
         let lastCharType = CHARACTER_TYPES.NONE;
         let wordType = WORD_TYPES.NONE;
-        let firstToken = null;
-        let lastToken = null;
+        let firstWord = null;
+        let lastWord = null;
         let numberHasPeriod = false;
 
-        let testToken = (charType) => {
+        let testWord = (charType) => {
             let handler = handlers[wordType];
             let emmitToken = handler(charType);
 
             if (emmitToken) {
-                createToken();
+                createWord();
             }
         };
 
-        let createToken = () => {
-            let word = input.slice(tokenStart, ix);
-            if (word === "true") {
+        let createWord = () => {
+            let value = input.slice(tokenWord, ix);
+            if (value === "true") {
                 wordType = WORD_TYPES.TRUE;
             }
-            else if (word === "false") {
+            else if (value === "false") {
                 wordType = WORD_TYPES.FALSE;
             }
-            else if (word === "null") {
+            else if (value === "null") {
                 wordType = WORD_TYPES.NULL;
             }
 
-            let token = new Token(wordType, word);
+            let word = new Word(wordType, value);
 
-            if (firstToken === null) {
-                firstToken = token;
+            if (firstWord === null) {
+                firstWord = word;
             }
             else {
-                token.prev = token;
-                lastToken.next = token;
+                word.prev = word;
+                lastWord.next = word;
             }
 
-            lastToken = token;
-            tokenStart = ix
+            lastWord = word;
+            tokenWord = ix
             wordType = WORD_TYPES.NONE;
         }
 
@@ -313,7 +379,7 @@ let Bowtie;
                     return startNumber();
                 case CHARACTER_TYPES.WHITE_SPACE:
                     wordType = WORD_TYPES.NONE;
-                    tokenStart += 1;
+                    tokenWord += 1;
                     break;
                 case CHARACTER_TYPES.OPEN_PAREN:
                     throw new Error("Not Implemented");
@@ -335,7 +401,7 @@ let Bowtie;
                     break;
                 case CHARACTER_TYPES.QUOTE:
                     wordType = WORD_TYPES.STRING;
-                    tokenStart += 1;
+                    tokenWord += 1;
                     break;
                 case CHARACTER_TYPES.OPERATOR:
                     throw new Error("Not Implemented");
@@ -461,53 +527,53 @@ let Bowtie;
                 charType = CHARACTER_TYPES.UNKNOWN;
             }
 
-            testToken(charType);
+            testWord(charType);
 
             lastCharType = charType;
             ix += 1;
         }
 
         charType = CHARACTER_TYPES.NONE;
-        testToken(charType);
+        testWord(charType);
 
-        return firstToken;
+        return firstWord;
     }
 
     /**
      * Return binding object for a specific token
-     * @param {Token} token 
+     * @param {Word} firstWord 
      */
-    function createBinder(token) {
+    function createBinder(firstWord) {
 
-        let currentToken = token;
+        let currentWord = firstWord;
         let currentBinder = null;
 
-        let handleNone = (token) => {
+        let handleNone = (word) => {
             throw new Error("Binding Error: None Word type passed into binder.");
         }
 
-        let handleNumber = (token) => {
-            return new LiteralBinder(parseFloat(token.value));
+        let handleNumber = (word) => {
+            return new LiteralBinder(parseFloat(word.value));
         }
 
-        let handleString = (token) => {
-            return new LiteralBinder(token.value);
+        let handleString = (word) => {
+            return new LiteralBinder(word.value);
         }
 
-        let handleTrue = (token) => {
+        let handleTrue = (word) => {
             return new LiteralBinder(true);
         }
 
-        let handleFalse = (token) => {
+        let handleFalse = (word) => {
             return new LiteralBinder(false);
         }
 
-        let handleNull = (token) => {
+        let handleNull = (word) => {
             return new LiteralBinder(null);
         }
 
-        let handleLookup = (token) => {
-            throw new Error("Not Implemented!")
+        let handleLookup = (word) => {
+            return new LookupBinder(word.value);
         }
 
         let handlers = [
@@ -520,18 +586,50 @@ let Bowtie;
             handleLookup,
         ];
 
-        while (currentToken !== null) {
-            let handler = handlers[currentToken.type];
+        while (currentWord !== null) {
+            let handler = handlers[currentWord.type];
 
             if (handler === undefined) {
-                throw new Error(`Binding Error: Unknown handler type for token type ${currentToken.type}`)
+                throw new Error(`Binding Error: Unknown handler type for token type ${currentWord.type}`)
             }
 
-            currentBinder = handler(currentToken);
-            currentToken = currentToken.next;
+            currentBinder = handler(currentWord);
+            currentWord = currentWord.next;
         }
 
         return currentBinder;
+    }
+
+    function createBindingFromString(input) {
+        let words = parseTokenString(input);
+        let binder = createBinder(words);
+        return binder;
+    }
+
+    function bindAttribute(source, target, attributeName, attributeValue) {
+        let binder = createBindingFromString(attributeValue);
+        binder.bind(source, target, targetAttribute);
+        return binder;
+    }
+
+    function bindElement(context, element) {
+        let contextAttr = element.getAttribute("data-context");
+        if (contextAttr) {
+            let contextBinder = bindAttribute(context, element, "dataContext", contextAttr);
+            throw new Error("Not Implemented");
+            context = context.getContext(element, contextAttr);
+        }
+        let attributeNames = [];
+        for (let name of attributeNames) {
+            if (name.startsWith("data-bind-")) {
+                var value = element.getAttribute(name);
+            }
+        }
+        for (let child of element.childNodes) {
+            if (child instanceof Element) {
+                bindElement(context, child);
+            }
+        }
     }
 
     /** 
@@ -544,71 +642,6 @@ let Bowtie;
         bindInternal(context, body);
     }
 
-    /* Public Classes */
-
-    /** 
-     *  Represents an object that notifies when data has been changed.
-     */
-    class Observable {
-        constructor(state) {
-            this._eventListeners = {};
-            if (state instanceof Observable) {
-                return state;
-            }
-            if (!state) {
-                state = {};
-            }
-            this._state = state;
-        }
-        get state() {
-            return this._state;
-        }
-        getValue(key) {
-            return this._state[key];
-        }
-        setValue(key, value) {
-            if (this._state[key] !== value) {
-                let previousValue = this._state[key];
-                this._state[key] = value;
-                this.dispatchEvent(new CustomEvent("changed", {
-                    detail: {
-                        propertyName: key,
-                        previousValue: previousValue,
-                        newValue: value
-                    }
-                }));
-            }
-        }
-        addEventListener(type, listener, options) {
-            if (!(type in this._eventListeners)) {
-                this._eventListeners[type] = [];
-            }
-            this._eventListeners[type].push(listener);
-        }
-        dispatchEvent(evt) {
-            if (!(event.type in this._eventListeners)) {
-                return true;
-            }
-            var stack = this._eventListeners[event.type].slice();
-            for (var i = 0, l = stack.length; i < l; i++) {
-                stack[i].call(this, event);
-            }
-            return !event.defaultPrevented;
-        }
-        removeEventListener(type, listener, options) {
-            if (!(type in this._eventListeners)) {
-                return;
-            }
-            var stack = this._eventListeners[type];
-            for (var i = 0, l = stack.length; i < l; i++) {
-                if (stack[i] === listener) {
-                    stack.splice(i, 1);
-                    return;
-                }
-            }
-        }
-    } /* class Observable */
-
     /* Export Public Bowtie Properties */
     Bowtie.BINDER_TYPES = BINDER_TYPES;
     Bowtie.WORD_TYPES = WORD_TYPES;
@@ -617,9 +650,13 @@ let Bowtie;
     Bowtie.parseTokenString = parseTokenString;
     Bowtie.createBinder = createBinder;
 
+    Bowtie.Word = Word;
+    Bowtie.Binder = Binder;
+    Bowtie.LiteralBinder = LiteralBinder;
+    Bowtie.LookupBinder = LookupBinder;
     Bowtie.Observable = Observable;
 })(Bowtie || (Bowtie = {}));
 
-if (module.exports !== undefined) {
+if (module !== undefined && module.exports !== undefined) {
     module.exports = Bowtie
 }
