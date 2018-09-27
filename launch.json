@@ -1,0 +1,16 @@
+{
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Jasmine Individual Test",
+            "program": "${workspaceRoot}\\node_modules\\jasmine\\bin\\jasmine.js",
+            "args": [
+                "spec\\todoSpec.js"
+            ],
+            "env": {
+                "NODE_PATH": "."
+            }
+        }
+    ]
+}
