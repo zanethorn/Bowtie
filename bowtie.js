@@ -118,7 +118,7 @@ let Bowtie;
     const BINDER_TYPES = {
         NONE: 0,
         LITERAL: 1,
-        MEMBER: 2,
+        MEMBER_LOOKUP: 2,
         GROUP: 3,
 
     }
@@ -150,6 +150,10 @@ let Bowtie;
         get value() {
             return this._value;
         }
+
+        getBindingValue(context) {
+            throw Error("Binding Error: Method is Abstract.");
+        }
     }
 
     class LiteralBinder extends Binder {
@@ -158,13 +162,19 @@ let Bowtie;
         }
 
         bind(source, target, targetAttribute) {
-            target.setAttribute(targetAttribute, this.value);
+            ensureBindings(target);
+            target.setAttribute(targetAttribute, getBindingValue(source));
+            target.bindings.push(this);
+        }
+
+        getBindingValue(context) {
+            return this.value;
         }
     }
 
     class LookupBinder extends Binder {
         constructor(value) {
-            super(BINDER_TYPES.LOOKUP, value);
+            super(BINDER_TYPES.MEMBER_LOOKUP, value);
             this._isTwoWay = true;
         }
 
@@ -177,30 +187,57 @@ let Bowtie;
         }
 
         bind(source, target, targetAttribute) {
+            ensureBindings(target);
             source.addEventListener("changed", (ev) => {
-                target.setAttribute(targetAttribute, source.getAttribute(this.value))
+                target.setAttribute(targetAttribute, this.getBindingValue(source));
             });
+            target.bindings.push(this);
 
-            if (target instanceof Observable) {
+            if (target instanceof Element){
+                ensureBindings(source);
+
+                if (target.onchange !== undefined && targetAttribute === "value"){
+                    target.onchange = (ev) => {
+                        source.setAttribute(this.value, target.value);
+                    }
+
+                    source.bindings.push(this);
+                }
+                else if (window.MutationObserver !== undefined) {
+                    let mutationConfig = { characterData: true, attributes: true };
+                    let targetObserver = new window.MutationObserver((mutations) => {
+                        for (let mutation of mutations) {
+                            if (mutation.type === 'attributes' && mutation.attributeName === targetAttribute) {
+                                let currentValue = this.getBindingValue(source);
+                                let newValue = target.getAttribute(targetAttribute);
+                                if (currentValue !== newValue) {
+                                    source.setAttribute(this.value, newValue);
+                                }
+                            }
+                        }
+                        targetObserver.observe(target, mutationConfig);
+                    });
+
+                    source.bindings.push(this);
+                }
+                else {
+                    this._isTwoWay = false;
+                }
+            }
+            else {
+                target = new Observable(target);
+                ensureBindings(source);
                 target.addEventListener("changed", (ev) => {
                     source.setAttribute(this.value, target.getAttribute(targetAttribute));
                 });
-            }
-            else if (window.MutationObserver !== undefined) {
-                let targetObserver = new window.MutationObserver((mutations) => {
-                    for (let mutation of mutations) {
-                        if (mutation.type === 'attributes' && mutation.attributeName === targetAttribute) {
-                            source.setAttribute(this.value, target.getAttribute(targetAttribute));
-                        }
-                    }
-                });
-                targetObserver.observe(target, { attributes: true });
-            }
-            else {
-                this._isTwoWay = false;
+                source.bindings.push(this);
             }
 
-            target.setAttribute(targetAttribute, source.getAttribute(this.value))
+            target.setAttribute(targetAttribute, this.getBindingValue(source))
+        }
+
+        getBindingValue(context) {
+            return context.getAttribute(this.value)
         }
     }
 
@@ -281,18 +318,21 @@ let Bowtie;
     } /* class Observable */
 
     class DataContext extends Observable {
-        constructor(data, element, parent) {
+
+        constructor(data, parent) {
+            super(data);
+
             if (!parent) {
                 parent = this;
             }
             this._data = data;
-            this._element = element;
+            //this._element = element;
             this._parent = parent;
-            this._token = token;
+            //this._token = token;
         }
-        get element() {
-            return this._element;
-        }
+        //get element() {
+        //    return this._element;
+        //}
         get parent() {
             return this._parent;
         }
@@ -606,28 +646,43 @@ let Bowtie;
         return binder;
     }
 
+    function ensureBindings(obj) {
+        if (obj['bindings'] === undefined) {
+            obj['bindings'] = [];
+        }
+    }
+
     function bindAttribute(source, target, attributeName, attributeValue) {
         let binder = createBindingFromString(attributeValue);
-        binder.bind(source, target, targetAttribute);
+        binder.bind(source, target, attributeName);
         return binder;
     }
+
+
+
 
     function bindElement(context, element) {
         let contextAttr = element.getAttribute("data-context");
         if (contextAttr) {
+            // Bind context to node
             let contextBinder = bindAttribute(context, element, "dataContext", contextAttr);
-            throw new Error("Not Implemented");
-            context = context.getContext(element, contextAttr);
+            // update the working context object
+            context = contextBinder.getBindingValue(context);
         }
-        let attributeNames = [];
-        for (let name of attributeNames) {
-            if (name.startsWith("data-bind-")) {
-                var value = element.getAttribute(name);
+
+        for (let attr of element.attributes) {
+            if (attr.name.startsWith("data-bind-")) {
+                let boundName = attr.name.substring(10);
+                let attributeBinder = bindAttribute(context, element, boundName, attr.value);
             }
         }
-        for (let child of element.childNodes) {
-            if (child instanceof Element) {
-                bindElement(context, child);
+
+        if (element.children !== undefined) {
+
+            for (let child of element.children) {
+                if (child instanceof Element) {
+                    bindElement(context, child);
+                }
             }
         }
     }
@@ -635,11 +690,9 @@ let Bowtie;
     /** 
      * Main Entry point.  Binds data to the HTML
      */
-    function tie(data) {
-        let observableData = new Bowtie.Observable(data);
-        let body = document.body;
-        let context = new Bowtie.DataContext(observableData, body, null);
-        bindInternal(context, body);
+    function tie(source, target) {
+        let context = new DataContext(source);
+        bindElement(context, target);
     }
 
     /* Export Public Bowtie Properties */
