@@ -7,15 +7,38 @@
     </div>
 
     <div>
-        <span>Another Name:</span>
-        <input type="text" data-bind-value="name" />
+        <h4>Aliases:</h4>
+        <ul data-foreach="aliases">
+            <li>
+                <input type="text" data-bind-value="." />
+            </li>
+        </ul>
+    </div>
+    <div data-context="home_planet">
+        <div>
+            <span>Name:</span>
+            <input type="text" data-bind-value="name" />
+        </div>
+        <div>
+            <span>Status:</span>
+            <select data-bind-value="status">
+                <option>OK</option>
+                <option>Destroyed</option>
+            </select>
+        </div>
     </div>
 
 
     <script type="text/javascript" src="../bowtie.js"></script>
     <script type="text/javascript">
         let data = {
-            "name": "This named control"
+            "name": "Kal-El",
+            "aliases": ["Superman", "Clark Kent"],
+            "home_planet": {
+                "name": "Krypton",
+                "status": "Destroyed"
+            },
+            "weaknesses": "Kryptonite"
         }
 
         document.addEventListener("DOMContentLoaded", () => Bowtie.tie(data, document.body));

@@ -59,24 +59,29 @@ describe("Word Parser", () => {
         expect(result.value).toBe("name");
     });
 
-    it("should parse result true to a true result", () => {
+    it("should parse word true to a true result", () => {
         let result = Bowtie.parseTokenString("true");
         expect(result.type).toBe(Bowtie.WORD_TYPES.TRUE);
         expect(result.value).toBe("true");
     });
 
-    it("should parse result false to a false result", () => {
+    it("should parse word false to a false result", () => {
         let result = Bowtie.parseTokenString("false");
         expect(result.type).toBe(Bowtie.WORD_TYPES.FALSE);
         expect(result.value).toBe("false");
     });
 
-    it("should parse result null to a null result", () => {
+    it("should parse word null to a null result", () => {
         let result = Bowtie.parseTokenString("null");
         expect(result.type).toBe(Bowtie.WORD_TYPES.NULL);
         expect(result.value).toBe("null");
     });
 
+    it("should parse '.' to a lookup result", () => {
+        let result = Bowtie.parseTokenString(".");
+        expect(result.type).toBe(Bowtie.WORD_TYPES.LOOKUP);
+        expect(result.value).toBe(".");
+    });
 });
 
 describe("Word Binder", () => {

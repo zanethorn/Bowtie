@@ -74,6 +74,7 @@ let Bowtie;
         "X": CHARACTER_TYPES.LETTER,
         "Y": CHARACTER_TYPES.LETTER,
         "Z": CHARACTER_TYPES.LETTER,
+        "_": CHARACTER_TYPES.LETTER,
         "1": CHARACTER_TYPES.NUMBER,
         "2": CHARACTER_TYPES.NUMBER,
         "3": CHARACTER_TYPES.NUMBER,
@@ -118,8 +119,9 @@ let Bowtie;
     const BINDER_TYPES = {
         NONE: 0,
         LITERAL: 1,
-        MEMBER_LOOKUP: 2,
-        GROUP: 3,
+        SOURCE: 2,
+        MEMBER_LOOKUP: 3,
+        GROUP: 4,
 
     }
 
@@ -151,7 +153,7 @@ let Bowtie;
             return this._value;
         }
 
-        getBindingValue(context) {
+        getBindingValue(source) {
             throw Error("Binding Error: Method is Abstract.");
         }
     }
@@ -163,12 +165,31 @@ let Bowtie;
 
         bind(source, target, targetAttribute) {
             ensureBindings(target);
-            target.setAttribute(targetAttribute, getBindingValue(source));
+            target.setAttribute(targetAttribute, this.getBindingValue(source));
             target.bindings.push(this);
         }
 
-        getBindingValue(context) {
+        getBindingValue(source) {
             return this.value;
+        }
+    }
+
+    class SourceBinder extends Binder {
+        constructor() {
+            super(BINDER_TYPES.SOURCE);
+        }
+
+        bind(source, target, targetAttribute) {
+            ensureBindings(target);
+            target.setAttribute(targetAttribute, this.getBindingValue(source));
+            target.bindings.push(this);
+        }
+
+        getBindingValue(source) {
+            if (source instanceof Observable) {
+                return source.state;
+            }
+            return source;
         }
     }
 
@@ -193,14 +214,15 @@ let Bowtie;
             });
             target.bindings.push(this);
 
-            if (target instanceof Element){
+            if (target instanceof Element) {
                 ensureBindings(source);
 
-                if (target.onchange !== undefined && targetAttribute === "value"){
+                if (target.onchange !== undefined && targetAttribute === "value") {
                     target.onchange = (ev) => {
                         source.setAttribute(this.value, target.value);
                     }
 
+                    target.value = this.getBindingValue(source);
                     source.bindings.push(this);
                 }
                 else if (window.MutationObserver !== undefined) {
@@ -233,7 +255,7 @@ let Bowtie;
                 source.bindings.push(this);
             }
 
-            target.setAttribute(targetAttribute, this.getBindingValue(source))
+            target.setAttribute(targetAttribute, this.getBindingValue(source));
         }
 
         getBindingValue(context) {
@@ -326,13 +348,8 @@ let Bowtie;
                 parent = this;
             }
             this._data = data;
-            //this._element = element;
             this._parent = parent;
-            //this._token = token;
         }
-        //get element() {
-        //    return this._element;
-        //}
         get parent() {
             return this._parent;
         }
@@ -434,7 +451,7 @@ let Bowtie;
                     throw new Error("Not Implemented");
                     break;
                 case CHARACTER_TYPES.PERIOD:
-                    throw new Error("Not Implemented");
+                    wordType = WORD_TYPES.LOOKUP;
                     break;
                 case CHARACTER_TYPES.COMMA:
                     throw new Error("Not Implemented");
@@ -521,7 +538,7 @@ let Bowtie;
                 case CHARACTER_TYPES.CLOSE_BRACKET:
                 case CHARACTER_TYPES.CLOSE_PAREN:
                 case CHARACTER_TYPES.UNKNOWN:
-                    throw new Error(`Parser Error: Invalid character at index ${ix}`);
+                    throw new Error(`Parser Error: Invalid character '${input[ix]}' at index ${ix}`);
                 case CHARACTER_TYPES.OPEN_BRACKET:
                     throw new Error("Not Implemented");
                     break;
@@ -613,6 +630,9 @@ let Bowtie;
         }
 
         let handleLookup = (word) => {
+            if (word.value === ".") {
+                return new SourceBinder();
+            }
             return new LookupBinder(word.value);
         }
 
@@ -667,7 +687,8 @@ let Bowtie;
             // Bind context to node
             let contextBinder = bindAttribute(context, element, "dataContext", contextAttr);
             // update the working context object
-            context = contextBinder.getBindingValue(context);
+            let contextData = contextBinder.getBindingValue(context);
+            context = new DataContext(contextData, context);
         }
 
         for (let attr of element.attributes) {
@@ -677,8 +698,31 @@ let Bowtie;
             }
         }
 
-        if (element.children !== undefined) {
+        let loopAttribute = element.getAttribute("data-foreach");
+        if (loopAttribute) {
+            // get the inner HTML and set up a template
+            let html = element.innerHTML.trim();
+            element.innerHTML = "";
 
+            let template = document.createElement("template");
+            template.innerHTML = html;
+            element.template = template;
+
+            // Bind context to node
+            let contextBinder = bindAttribute(context, element, "items", loopAttribute);
+            // update the working context object
+            let itemData = contextBinder.getBindingValue(context);
+            for (let item of itemData) {
+                let itemContext = new DataContext(item, context);
+                template.innerHTML = html;
+
+                for (let child of template.content.children) {
+                    element.appendChild(child);
+                    bindElement(itemContext, child);
+                }
+            }
+        }
+        else if (element.children !== undefined) {
             for (let child of element.children) {
                 if (child instanceof Element) {
                     bindElement(context, child);
