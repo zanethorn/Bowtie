@@ -49,7 +49,7 @@ describe("Word Parser", () => {
 
     it("should parse a simple string to a lookup result", () => {
         let result = Bowtie.parseTokenString("name");
-        expect(result.type).toBe(Bowtie.WORD_TYPES.LOOKUP);
+        expect(result.type).toBe(Bowtie.WORD_TYPES.MEMBER_LOOKUP);
         expect(result.value).toBe("name");
     });
 
@@ -77,10 +77,16 @@ describe("Word Parser", () => {
         expect(result.value).toBe("null");
     });
 
-    it("should parse '.' to a lookup result", () => {
+    it("should parse '.' to a member lookup result", () => {
         let result = Bowtie.parseTokenString(".");
-        expect(result.type).toBe(Bowtie.WORD_TYPES.LOOKUP);
+        expect(result.type).toBe(Bowtie.WORD_TYPES.MEMBER_LOOKUP);
         expect(result.value).toBe(".");
+    });
+
+    it("should parse 'test(' to a function open", () => {
+        let result = Bowtie.parseTokenString("test(");
+        expect(result.type).toBe(Bowtie.WORD_TYPES.FUNCTION_LOOKUP);
+        expect(result.value).toBe("test(");
     });
 });
 
