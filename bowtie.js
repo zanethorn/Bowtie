@@ -1,25 +1,37 @@
-var window = (window || {});
+"use strict";
+if (!window) {
+    var window = { Element: function () { } };
+}
 var module = (module || undefined);
 
-let Bowtie;
+var Bowtie;
 (function (Bowtie) {
 
-    /* Global Constants */
-    const CHARACTER_TYPES = {
-        NONE: 0,
-        LETTER: 1,
-        NUMBER: 2,
-        WHITE_SPACE: 3,
-        OPEN_PAREN: 4,
-        CLOSE_PAREN: 5,
-        OPEN_BRACKET: 6,
-        CLOSE_BRACKET: 7,
-        PERIOD: 8,
-        COMMA: 9,
-        QUOTE: 10,
-        OPERATOR: 11,
-        UNKNOWN: 99,
+    /**
+     * Consolodate error messages into one location for ease of translation
+     */
+    const ERRORS = {
+        UNRECOGNIZED_SYMBOL: "Unrecognized or invalid symbol '{1}' at index {0}."
     };
+    Object.freeze(ERRORS);
+
+    /* Global Constants */
+    const CHARACTER_TYPES = {};
+    (function (CHARACTER_TYPES) {
+        CHARACTER_TYPES[CHARACTER_TYPES["NONE"] = 0] = "NONE";
+        CHARACTER_TYPES[CHARACTER_TYPES["LETTER"] = 1] = "LETTER";
+        CHARACTER_TYPES[CHARACTER_TYPES["NUMBER"] = 2] = "NUMBER";
+        CHARACTER_TYPES[CHARACTER_TYPES["QUOTE"] = 3] = "QUOTE";
+
+        CHARACTER_TYPES[CHARACTER_TYPES["OPEN_PAREN"] = 4] = "OPEN_PAREN";
+        CHARACTER_TYPES[CHARACTER_TYPES["CLOSE_PAREN"] = 5] = "CLOSE_PAREN";
+        CHARACTER_TYPES[CHARACTER_TYPES["OPEN_BRACKET"] = 6] = "OPEN_BRACKET";
+        CHARACTER_TYPES[CHARACTER_TYPES["CLOSE_BRACKET"] = 7] = "CLOSE_BRACKET";
+        CHARACTER_TYPES[CHARACTER_TYPES["PERIOD"] = 8] = "PERIOD";
+        CHARACTER_TYPES[CHARACTER_TYPES["COMMA"] = 9] = "COMMA";
+        CHARACTER_TYPES[CHARACTER_TYPES["OPERATOR"] = 10] = "OPERATOR";
+    })(CHARACTER_TYPES);
+    Object.freeze(CHARACTER_TYPES);
 
     const CHARACTER_MAP = {
         "a": CHARACTER_TYPES.LETTER,
@@ -105,25 +117,137 @@ let Bowtie;
         "|": CHARACTER_TYPES.OPERATOR,
         "!": CHARACTER_TYPES.OPERATOR,
     };
+    Object.freeze(CHARACTER_MAP);
 
-    const WORD_TYPES = {
-        NONE: 0,
-        NUMBER: 1,
-        STRING: 2,
-        TRUE: 3,
-        FALSE: 4,
-        NULL: 5,
-        LOOKUP: 6,
-    };
+    const TOKEN_TYPES = {};
+    (function (TOKEN_TYPES) {
+        TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.NONE]] = CHARACTER_TYPES.NONE] = CHARACTER_TYPES[CHARACTER_TYPES.NONE];
+        TOKEN_TYPES[TOKEN_TYPES["LOOKUP"] = 1] = "LOOKUP";
+        TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.NUMBER]] = CHARACTER_TYPES.NUMBER] = CHARACTER_TYPES[CHARACTER_TYPES.NUMBER];
+        TOKEN_TYPES[TOKEN_TYPES["STRING"] = 3] = "STRING";
+
+        TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.OPEN_PAREN]] = CHARACTER_TYPES.OPEN_PAREN] = CHARACTER_TYPES[CHARACTER_TYPES.OPEN_PAREN];
+        TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.CLOSE_PAREN]] = CHARACTER_TYPES.CLOSE_PAREN] = CHARACTER_TYPES[CHARACTER_TYPES.CLOSE_PAREN];
+        TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.OPEN_BRACKET]] = CHARACTER_TYPES.OPEN_BRACKET] = CHARACTER_TYPES[CHARACTER_TYPES.OPEN_BRACKET];
+        TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.CLOSE_BRACKET]] = CHARACTER_TYPES.CLOSE_BRACKET] = CHARACTER_TYPES[CHARACTER_TYPES.CLOSE_BRACKET];
+        TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.PERIOD]] = CHARACTER_TYPES.PERIOD] = CHARACTER_TYPES[CHARACTER_TYPES.PERIOD];
+        TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.COMMA]] = CHARACTER_TYPES.COMMA] = CHARACTER_TYPES[CHARACTER_TYPES.COMMA];
+        TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.OPERATOR]] = CHARACTER_TYPES.OPERATOR] = CHARACTER_TYPES[CHARACTER_TYPES.OPERATOR];
+    })(TOKEN_TYPES);
+    Object.freeze(TOKEN_TYPES);
+
+
+    class ParseState {
+        constructor(state, inputIndex, length) {
+            this.state = state;
+            this.inputIndex = inputIndex;
+            this.length = length;
+        }
+    }
+
+    const LR_TABLE = [
+        []
+    ];
+
 
     const BINDER_TYPES = {
         NONE: 0,
         LITERAL: 1,
         SOURCE: 2,
         MEMBER_LOOKUP: 3,
-        GROUP: 4,
+        FUNCTION_LOOKUP: 4,
+        INDEX_LOOKUP: 5,
+        GROUP: 6,
 
     }
+
+    const FUNCTIONS = {
+
+    }
+
+    class Token {
+        constructor(type, startPtr, length) {
+            this.type = type;
+            this.startPtr = startPtr;
+            this.length = length;
+        }
+
+        static *tokenize(input) {
+            let startPtr = 0;
+            let endPtr = 0;
+            let tokenType = TOKEN_TYPES.NONE;
+
+            while (endPtr < input.length) {
+                let char = input[endPtr];
+                let charType = CHARACTER_MAP[char];
+
+                switch (charType) {
+                    case undefined:
+                        throw new Error(String.format(ERRORS.UNRECOGNIZED_SYMBOL, char, endPtr));
+
+                    case CHARACTER_TYPES.NONE:
+                        if (tokenType !== TOKEN_TYPES.NONE) {
+                            yield new Token(tokenType, startPtr, endPtr - startPtr);
+                            tokenType = TOKEN_TYPES.NONE;
+                        }
+                        startPtr += endPtr + 1;
+                        break;
+
+                    case CHARACTER_TYPES.QUOTE:
+                        if (tokenType === TOKEN_TYPES.STRING) {
+                            yield new Token(tokenType, startPtr, endPtr - startPtr);
+                            tokenType = TOKEN_TYPES.NONE;
+                        }
+                        else {
+                            tokenType = TOKEN_TYPES.STRING;
+                        }
+                        startPtr += endPtr + 1;
+                        break;
+
+                    case CHARACTER_TYPES.NUMBER:
+                        if (tokenType === TOKEN_TYPES.NONE) {
+                            tokenType = TOKEN_TYPES.NUMBER;
+                        }
+                        break;
+
+                    case CHARACTER_TYPES.LETTER:
+                        if (tokenType === TOKEN_TYPES.NONE) {
+                            tokenType = TOKEN_TYPES.LOOKUP;
+                        }
+                        break;
+
+                    default:
+                        if (tokenType !== TOKEN_TYPES.NONE) {
+                            yield new Token(tokenType, startPtr, endPtr - startPtr);
+                            tokenType = TOKEN_TYPES.NONE;
+                        }
+                        yield new Token(charType, endPtr, 1);
+                        startPtr += endPtr + 1;
+                        break;
+                }
+
+                endPtr += 1;
+            }
+
+            if (tokenType !== TOKEN_TYPES.NONE) {
+                yield new Token(tokenType, startPtr, endPtr - startPtr);
+            }
+
+        }
+
+
+    }
+
+    function parse_word(input) {
+        stack = []
+
+
+        topOfStack = null;
+        nextInput = input;
+
+
+
+    };
 
     /* Public Classes */
 
@@ -133,7 +257,7 @@ let Bowtie;
             this._value = value;
         }
 
-        bind(source, target, targetAttribute) {
+        bind(context, target, targetAttribute) {
             throw Error("Binding Error: Method is Abstract.");
         }
 
@@ -153,8 +277,14 @@ let Bowtie;
             return this._value;
         }
 
-        getBindingValue(source) {
+        getBindingValue(context) {
             throw Error("Binding Error: Method is Abstract.");
+        }
+    }
+
+    class PartialBinder extends Binder {
+        constructor(type, value) {
+            super(type, value);
         }
     }
 
@@ -163,84 +293,71 @@ let Bowtie;
             super(BINDER_TYPES.LITERAL, value);
         }
 
-        bind(source, target, targetAttribute) {
+        bind(context, target, targetAttribute) {
             ensureBindings(target);
-            target.setAttribute(targetAttribute, this.getBindingValue(source));
+            target.setAttribute(targetAttribute, this.getBindingValue(context));
             target.bindings.push(this);
         }
 
-        getBindingValue(source) {
+        getBindingValue(context) {
             return this.value;
         }
     }
 
-    class SourceBinder extends Binder {
-        constructor() {
-            super(BINDER_TYPES.SOURCE);
-        }
-
-        bind(source, target, targetAttribute) {
-            ensureBindings(target);
-            target.setAttribute(targetAttribute, this.getBindingValue(source));
-            target.bindings.push(this);
-        }
-
-        getBindingValue(source) {
-            if (source instanceof Observable) {
-                return source.state;
-            }
-            return source;
-        }
-    }
-
     class LookupBinder extends Binder {
-        constructor(value) {
-            super(BINDER_TYPES.MEMBER_LOOKUP, value);
-            this._isTwoWay = true;
-        }
+        constructor(type, value, parent) {
+            super(type, value);
 
-        get isTwoWay() {
-            return this._isTwoWay;
+            if (parent !== undefined && !(parent instanceof LookupBinder)) {
+                throw new Error("Parent Lookup must be a LookupBinder");
+            }
+
+            this._parent = parent;
         }
 
         get isDynamic() {
             return true;
         }
 
-        bind(source, target, targetAttribute) {
+        get parent() {
+            return this._parent;
+        }
+
+        bind(context, target, targetAttribute) {
+            ensureBindings(context);
             ensureBindings(target);
-            source.addEventListener("changed", (ev) => {
-                target.setAttribute(targetAttribute, this.getBindingValue(source));
+            context.addEventListener("changed", (ev) => {
+                target.setAttribute(targetAttribute, this.getBindingValue(context));
             });
+
             target.bindings.push(this);
 
-            if (target instanceof Element) {
-                ensureBindings(source);
+            if (target instanceof window.Element) {
 
                 if (target.onchange !== undefined && targetAttribute === "value") {
                     target.onchange = (ev) => {
-                        source.setAttribute(this.value, target.value);
+                        context.setAttribute(this.value, target.value);
                     }
 
-                    target.value = this.getBindingValue(source);
-                    source.bindings.push(this);
+                    target.value = this.getBindingValue(context);
+                    context.bindings.push(this);
                 }
                 else if (window.MutationObserver !== undefined) {
                     let mutationConfig = { characterData: true, attributes: true };
                     let targetObserver = new window.MutationObserver((mutations) => {
                         for (let mutation of mutations) {
                             if (mutation.type === 'attributes' && mutation.attributeName === targetAttribute) {
-                                let currentValue = this.getBindingValue(source);
+                                let currentValue = this.getBindingValue(context);
                                 let newValue = target.getAttribute(targetAttribute);
                                 if (currentValue !== newValue) {
-                                    source.setAttribute(this.value, newValue);
+                                    context.setAttribute(this.value, newValue);
                                 }
                             }
                         }
                         targetObserver.observe(target, mutationConfig);
                     });
 
-                    source.bindings.push(this);
+                    context.bindings.push(this);
                 }
                 else {
                     this._isTwoWay = false;
@@ -248,31 +365,322 @@ let Bowtie;
             }
             else {
                 target = new Observable(target);
-                ensureBindings(source);
+
                 target.addEventListener("changed", (ev) => {
-                    source.setAttribute(this.value, target.getAttribute(targetAttribute));
+                    context.setAttribute(this.value, target.getAttribute(targetAttribute));
                 });
-                source.bindings.push(this);
+                context.bindings.push(this);
             }
 
-            target.setAttribute(targetAttribute, this.getBindingValue(source));
+            target.setAttribute(targetAttribute, this.getBindingValue(context));
         }
 
         getBindingValue(context) {
-            return context.getAttribute(this.value)
+            return context.getAttribute(this.value);
         }
     }
 
-    /**
-     * Represents a completely parsed segment of an attribute binder
-     */
-    class Word {
-        constructor(type, value) {
-            this.type = type;
-            this.value = value;
-            this.next = null;
-            this.prev = null;
+    class SourceBinder extends LookupBinder {
+        constructor() {
+            super(BINDER_TYPES.SOURCE);
         }
+
+        bind(context, target, targetAttribute) {
+            ensureBindings(target);
+            target.setAttribute(targetAttribute, this.getBindingValue(context));
+            target.bindings.push(this);
+        }
+
+        getBindingValue(context) {
+            if (context instanceof Observable) {
+                return context.state;
+            }
+            return context;
+        }
+    }
+
+    class MemberLookupBinder extends LookupBinder {
+        constructor(value, parent) {
+            super(BINDER_TYPES.MEMBER_LOOKUP, value, parent);
+            this._isTwoWay = true;
+        }
+
+        get isTwoWay() {
+            return this._isTwoWay;
+        }
+
+        getBindingValue(context) {
+            return context.getAttribute(this.value);
+        }
+    }
+    class FunctionLookupBinder extends LookupBinder {
+        constructor(value, parameters, parent) {
+            super(BINDER_TYPES.FUNCTION_LOOKUP, value, parent);
+            this._parameters = parameters;
+        }
+
+        get parameters() {
+            return this._parameters;
+        }
+
+        bind(context, target, targetAttribute) {
+            let func = this.getBindingValue(context);
+
+            if (target instanceof window.Element && targetAttribute.startsWith("on")) {
+                ensureBindings(target);
+                target[targetAttribute] = () => {
+                    let params = undefined;
+                    if (this.parameters) {
+                        params = this.parameters.getBindingValue(context);
+                    }
+                    func.apply(context, params);
+                };
+            }
+            else {
+                target = new Observable(target);
+                ensureBindings(target);
+
+                let params = undefined;
+                if (this.parameters) {
+                    params = this.parameters.getBindingValue(context);
+                }
+
+                let value = func.apply(context, params);
+                target.setAttribute(targetAttribute, value);
+            }
+
+            target.bindings.push(this);
+        }
+
+        getBindingValue(context) {
+            let func = context.getAttribute(this.value);
+            if (func) {
+                return func;
+            }
+
+            func = FUNCTIONS[this.value];
+            if (!func) {
+                throw new Error(`Function '${this.value}' was not found.`);
+            }
+        }
+    }
+    class IndexLookupBinder extends LookupBinder {
+        constructor(value, parameters, parent) {
+            super(BINDER_TYPES.INDEX_LOOKUP, value, parent);
+
+            if (!parameters) {
+                throw new Error("Indexer must have a parameter");
+            }
+
+            this._parameters = parameters;
+        }
+
+        get parameters() {
+            return this._parameters;
+        }
+
+        getBindingValue(context) {
+            let base = super.getBindingValue(context)
+            let index = this.parameters.getBindingValue(context);
+            return base[index];
+        }
+    }
+
+    class BinaryOperatorBinder extends Binder {
+        constructor(type, value, left, right) {
+            super(type, value, parent);
+
+            this._left = left;
+            this._right = right;
+        }
+
+        get left() {
+            return this._left;
+        }
+
+        get right() {
+            return this._right;
+        }
+
+        getBindingValue(context) {
+            let leftValue = this.left.getBindingValue(context);
+            let rightValue = this.right.getBindingValue(context);
+            return this.operate(leftValue, rightValue);
+        }
+
+        operate(left, right) {
+            throw new Error("Not Implemented");
+        }
+    }
+
+    class PlusOperatorBinder extends BinaryOperatorBinder {
+        constructor(left, right) {
+            super(type, "+", left, right);
+        }
+
+        operate(left, right) {
+            return left + right;
+        }
+    }
+
+    class GroupBinder extends Binder {
+        constructor(inner) {
+            super(BINDER_TYPES.GROUP);
+
+            this._inner;
+        }
+
+        get left() {
+            return this._left;
+        }
+
+        get right() {
+            return this._right;
+        }
+
+        bind(context, target, targetAttribute) {
+            ensureBindings(target);
+            target.setAttribute(targetAttribute, this.getBindingValue(context));
+            target.bindings.push(this);
+        }
+
+        *getBindingValue(context) {
+            if (this.left) {
+                if (typeof this.left === "function") {
+                    for (let item of this.left) {
+                        return item;
+                    }
+                }
+                else {
+                    yield this.left;
+                }
+            }
+
+            if (this.right) {
+                if (typeof this.right === "function") {
+                    for (let item of this.right) {
+                        return item;
+                    }
+                }
+                else {
+                    yield this.right;
+                }
+            }
+        }
+    }
+
+    class BinderFactory {
+
+        constructor() {
+            this.currentWord = null;
+            this.currentBinder = null;
+            this.bindingFunctions = [
+                (word) => { /* handleNone */
+                    throw new Error("Binding Error: None Word type passed into binder.");
+                },
+                (word) => { /* handleNumber */
+                    return new LiteralBinder(parseFloat(word.value));
+                },
+                (word) => { /* handleString */
+                    return new LiteralBinder(word.value);
+                },
+                (word) => { /* handleTrue */
+                    return new LiteralBinder(true);
+                },
+                (word) => { /* handleFalse */
+                    return new LiteralBinder(false);
+                },
+                (word) => { /* handleNull */
+                    return new LiteralBinder(null);
+                },
+                (word) => { /* handleMemberLookup */
+                    if (word.value === "") {
+                        return new SourceBinder();
+                    }
+                    if (this.currentBinder instanceof LookupBinder) {
+                        return new MemberLookupBinder(word.value, this.currentBinder);
+                    }
+                    return new MemberLookupBinder(word.value);
+                },
+                (word) => { /* handleFunctionLookup */
+                    if (!word.next) {
+                        throw new Error("Unclosed function");
+                    }
+                    let functionBinder = new FunctionLookupBinder(word.value, previousBinder);
+                    let parametersBinder = createBinder(word.next, functionBinder);
+                    if (functionBinder === parametersBinder) {
+                        return functionBinder;
+                    }
+                    return new FunctionLookupBinder(word.value, parametersBinder, this.currentBinder);
+                },
+                (word) => { /* handleIndexLookup */
+                    if (!word.next) {
+                        throw new Error("Unclosed Index");
+                    }
+                    let parametersBinder = createBinder(word.next, new LookupBinder(word.value));
+                    return new IndexLookupBinder(word.value, parametersBinder);
+                },
+                (word) => { /* handleIndexClose */
+                    if (!this.currentBinder) {
+                        throw new Error("Index close found without a matching open");
+                    }
+                    return this.currentBinder;
+                },
+                (word) => { /* handleGroupOpen */
+                    throw new Error("Not Implemented.");
+                },
+                (word) => { /* handleGroupClose */
+                    if (!this.currentBinder) {
+                        throw new Error("Function close found without a matching open");
+                    }
+                    return this.currentBinder;
+                },
+                (word) => { /* handleOperator */
+                    if (!this.currentBinder) {
+                        switch (word.value) {
+                            case "-":
+                            case "!":
+                                let nextWord = word.next;
+                                if (!word.next) {
+                                    throw new Error(`Parser Error: invalid symbol '${word.value}'`);
+                                }
+                                let binder = this.createBinder(nextWord);
+
+                            default:
+                                throw new Error(`Parser Error: invalid symbol '${word.value}' without a proceeding operator value`);
+                        }
+
+                    }
+                    return this.currentBinder;
+                }
+            ]
+        }
+
+        createBinder(word) {
+            this.currentWord = word;
+            while (this.currentWord != null) {
+                let func = this._lookupHandler(this.currentWord);
+
+                this.currentBinder = func(this.currentWord);
+                this.currentWord = this.currentWord.next;
+            }
+
+            let result = this.currentBinder;
+            return result;
+        }
+
+        _lookupHandler(word) {
+            let func = this.bindingFunctions[word.type];
+
+            if (func === undefined) {
+                throw new Error(`Binding Error: Unknown handler type for token type ${word.type}`)
+            }
+
+            return func;
+        }
+
+
+
     }
 
     /** 
@@ -362,21 +770,14 @@ let Bowtie;
         }
     }
 
-    /* Global Private Functions */
-
-
-
-
-    /* Public Functions */
-
     /**
      * Parses a string into a chain of tokens
      * @param {} input 
      */
     function parseTokenString(input) {
-        let tokenWord = 0;
-        let ix = 0;
-        let lastCharType = CHARACTER_TYPES.NONE;
+        let wordStartIndex = 0;
+        let currentIndex = 0;
+        //let lastCharType = CHARACTER_TYPES.NONE;
         let wordType = WORD_TYPES.NONE;
         let firstWord = null;
         let lastWord = null;
@@ -384,6 +785,10 @@ let Bowtie;
 
         let testWord = (charType) => {
             let handler = handlers[wordType];
+            if (handler === undefined) {
+                throw new Error(`Handler undefined for word type '${wordType}'`);
+            }
+
             let emmitToken = handler(charType);
 
             if (emmitToken) {
@@ -392,7 +797,11 @@ let Bowtie;
         };
 
         let createWord = () => {
-            let value = input.slice(tokenWord, ix);
+            if (input[wordStartIndex] === ".") {
+                wordStartIndex += 1;
+            }
+
+            let value = input.slice(wordStartIndex, currentIndex);
             if (value === "true") {
                 wordType = WORD_TYPES.TRUE;
             }
@@ -403,18 +812,14 @@ let Bowtie;
                 wordType = WORD_TYPES.NULL;
             }
 
-            let word = new Word(wordType, value);
+            let word = new Word(wordType, value, lastWord);
 
             if (firstWord === null) {
                 firstWord = word;
             }
-            else {
-                word.prev = word;
-                lastWord.next = word;
-            }
 
             lastWord = word;
-            tokenWord = ix
+            wordStartIndex = currentIndex
             wordType = WORD_TYPES.NONE;
         }
 
@@ -430,38 +835,50 @@ let Bowtie;
                     wordType = WORD_TYPES.NONE;
                     break;
                 case CHARACTER_TYPES.LETTER:
-                    wordType = WORD_TYPES.LOOKUP;
+                    wordType = WORD_TYPES.MEMBER_LOOKUP;
                     break;
                 case CHARACTER_TYPES.NUMBER:
                     return startNumber();
                 case CHARACTER_TYPES.WHITE_SPACE:
                     wordType = WORD_TYPES.NONE;
-                    tokenWord += 1;
+                    wordStartIndex += 1;
                     break;
                 case CHARACTER_TYPES.OPEN_PAREN:
-                    throw new Error("Not Implemented");
-                    break;
+                    wordType = WORD_TYPES.GROUP_OPEN;
+                    wordStartIndex += 1;
+                    return true;
                 case CHARACTER_TYPES.CLOSE_PAREN:
-                    throw new Error("Not Implemented");
-                    break;
+                    wordType = WORD_TYPES.GROUP_CLOSE;
+                    wordStartIndex += 1;
+                    return true;
                 case CHARACTER_TYPES.OPEN_BRACKET:
                     throw new Error("Not Implemented");
                     break;
                 case CHARACTER_TYPES.CLOSE_BRACKET:
-                    throw new Error("Not Implemented");
-                    break;
+                    wordType = WORD_TYPES.INDEX_CLOSE;
+                    wordStartIndex += 1;
+                    return true;
                 case CHARACTER_TYPES.PERIOD:
-                    wordType = WORD_TYPES.LOOKUP;
+                    wordStartIndex += 1;
+                    wordType = WORD_TYPES.MEMBER_LOOKUP;
                     break;
                 case CHARACTER_TYPES.COMMA:
                     throw new Error("Not Implemented");
                     break;
                 case CHARACTER_TYPES.QUOTE:
                     wordType = WORD_TYPES.STRING;
-                    tokenWord += 1;
+                    wordStartIndex += 1;
                     break;
                 case CHARACTER_TYPES.OPERATOR:
-                    throw new Error("Not Implemented");
+                    wordType = WORD_TYPES.OPERATOR;
+                    switch (input[wordStartIndex]) {
+                        case "&":
+                        case "|":
+                            return false;
+                        default:
+                            currentIndex += 1;
+                            return true;
+                    }
                     break;
                 default:
                     throw new Error(`Unknown Character type ${charType}`);
@@ -495,7 +912,7 @@ let Bowtie;
                     break;
                 case CHARACTER_TYPES.PERIOD:
                     if (numberHasPeriod) {
-                        throw new Error(`Parser Error: Invalid duplicate period in number at index ${ix}`);
+                        throw new Error(`Parser Error: Invalid duplicate period in number at index ${currentIndex}`);
                     }
                     numberHasPeriod = true;
                     return false; /* Continuing to build number */
@@ -523,37 +940,6 @@ let Bowtie;
             return false;
         }
 
-        let handleLookup = (charType) => {
-            switch (charType) {
-                case CHARACTER_TYPES.LETTER:
-                case CHARACTER_TYPES.NUMBER:
-                    return false; /* Keep building word */
-                case CHARACTER_TYPES.NONE:
-                case CHARACTER_TYPES.WHITE_SPACE:
-                case CHARACTER_TYPES.PERIOD:
-                case CHARACTER_TYPES.COMMA:
-                    return true; /* word ends */
-                case CHARACTER_TYPES.OPEN_PAREN:
-                    throw new Error("Not Implemented");
-                case CHARACTER_TYPES.CLOSE_BRACKET:
-                case CHARACTER_TYPES.CLOSE_PAREN:
-                case CHARACTER_TYPES.UNKNOWN:
-                    throw new Error(`Parser Error: Invalid character '${input[ix]}' at index ${ix}`);
-                case CHARACTER_TYPES.OPEN_BRACKET:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.QUOTE:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.OPERATOR:
-                    throw new Error("Not Implemented");
-                    break;
-                default:
-                    throw new Error(`Unknown Character type ${charType}`);
-            }
-            return false;
-        }
-
         let handleTrue = (charType) => {
             throw new Error("Parser Error: Method should never be called");
         }
@@ -566,6 +952,71 @@ let Bowtie;
             throw new Error("Parser Error: Method should never be called");
         };
 
+        let handleMemberLookup = (charType) => {
+            switch (charType) {
+                case CHARACTER_TYPES.LETTER:
+                case CHARACTER_TYPES.NUMBER:
+                    return false; /* Keep building word */
+                case CHARACTER_TYPES.PERIOD:
+                    if (wordStartIndex === currentIndex) {
+                        throw new Error(`Parser Error: Invalid character '${input[currentIndex]}' at index ${currentIndex}`);
+                    }
+                    return true;
+                case CHARACTER_TYPES.NONE:
+                case CHARACTER_TYPES.WHITE_SPACE:
+                case CHARACTER_TYPES.COMMA:
+                    return true;
+                case CHARACTER_TYPES.OPEN_PAREN:
+                    wordType = WORD_TYPES.FUNCTION_LOOKUP;
+                    return true; /* start parsing function parameters, if any */
+                case CHARACTER_TYPES.CLOSE_BRACKET:
+                case CHARACTER_TYPES.CLOSE_PAREN:
+                case CHARACTER_TYPES.UNKNOWN:
+                    throw new Error(`Parser Error: Invalid character '${input[currentIndex]}' at index ${currentIndex}`);
+                case CHARACTER_TYPES.OPEN_BRACKET:
+                    wordType = WORD_TYPES.INDEX_LOOKUP;
+                    return true; /* start parsing function parameters, if any */
+                case CHARACTER_TYPES.QUOTE:
+                    throw new Error("Not Implemented");
+                    break;
+                case CHARACTER_TYPES.OPERATOR:
+                    throw new Error("Not Implemented");
+                    break;
+                default:
+                    throw new Error(`Unknown Character type ${charType}`);
+            }
+            return false;
+        }
+
+        let handleFunctionLookup = (charType) => {
+            throw new Error("Parser Error: Method should never be called");
+        };
+
+        let handleIndexLookup = (charType) => {
+            throw new Error("Parser Error: Method should never be called");
+        };
+
+        let handleIndexClose = (charType) => {
+            throw new Error("Parser Error: Method should never be called");
+        };
+
+        let handleGroupOpen = (charType) => {
+            throw new Error("Parser Error: Method should never be called");
+        };
+
+        let handleGroupClose = (charType) => {
+            throw new Error("Parser Error: Method should never be called");
+        };
+
+        let handleOperator = (charType) => {
+            if (charType === CHARACTER_TYPES.OPERATOR) {
+                if (input[currentIndex] == input[wordStartIndex]) {
+                    return true;
+                }
+            }
+            throw new Error(`Parser Error: Invalid Syntax at ${currentIndex}`);
+        };
+
         let handlers = [
             handleNone,
             handleNumber,
@@ -573,11 +1024,17 @@ let Bowtie;
             handleTrue,
             handleFalse,
             handleNull,
-            handleLookup,
+            handleMemberLookup,
+            handleFunctionLookup,
+            handleIndexLookup,
+            handleIndexClose,
+            handleGroupOpen,
+            handleGroupClose,
+            handleOperator
         ];
 
-        while (ix < input.length) {
-            let char = input[ix];
+        while (currentIndex < input.length) {
+            let char = input[currentIndex];
             let charType = CHARACTER_MAP[char];
 
             if (charType === undefined) {
@@ -586,83 +1043,19 @@ let Bowtie;
 
             testWord(charType);
 
-            lastCharType = charType;
-            ix += 1;
+            //lastCharType = charType;
+            currentIndex += 1;
         }
 
-        charType = CHARACTER_TYPES.NONE;
-        testWord(charType);
+        testWord(CHARACTER_TYPES.NONE);
 
         return firstWord;
     }
 
-    /**
-     * Return binding object for a specific token
-     * @param {Word} firstWord 
-     */
-    function createBinder(firstWord) {
-
-        let currentWord = firstWord;
-        let currentBinder = null;
-
-        let handleNone = (word) => {
-            throw new Error("Binding Error: None Word type passed into binder.");
-        }
-
-        let handleNumber = (word) => {
-            return new LiteralBinder(parseFloat(word.value));
-        }
-
-        let handleString = (word) => {
-            return new LiteralBinder(word.value);
-        }
-
-        let handleTrue = (word) => {
-            return new LiteralBinder(true);
-        }
-
-        let handleFalse = (word) => {
-            return new LiteralBinder(false);
-        }
-
-        let handleNull = (word) => {
-            return new LiteralBinder(null);
-        }
-
-        let handleLookup = (word) => {
-            if (word.value === ".") {
-                return new SourceBinder();
-            }
-            return new LookupBinder(word.value);
-        }
-
-        let handlers = [
-            handleNone,
-            handleNumber,
-            handleString,
-            handleTrue,
-            handleFalse,
-            handleNull,
-            handleLookup,
-        ];
-
-        while (currentWord !== null) {
-            let handler = handlers[currentWord.type];
-
-            if (handler === undefined) {
-                throw new Error(`Binding Error: Unknown handler type for token type ${currentWord.type}`)
-            }
-
-            currentBinder = handler(currentWord);
-            currentWord = currentWord.next;
-        }
-
-        return currentBinder;
-    }
-
     function createBindingFromString(input) {
         let words = parseTokenString(input);
-        let binder = createBinder(words);
+        let factory = new BinderFactory();
+        let binder = factory.createBinder(words);
         return binder;
     }
 
@@ -677,9 +1070,6 @@ let Bowtie;
         binder.bind(source, target, attributeName);
         return binder;
     }
-
-
-
 
     function bindElement(context, element) {
         let contextAttr = element.getAttribute("data-context");
@@ -718,14 +1108,14 @@ let Bowtie;
 
                 for (let child of template.content.children) {
                     element.appendChild(child);
-                    bindElement(itemContext, child);
+                    setTimeout(() => bindElement(itemContext, child));
                 }
             }
         }
         else if (element.children !== undefined) {
             for (let child of element.children) {
                 if (child instanceof Element) {
-                    bindElement(context, child);
+                    setTimeout(() => bindElement(context, child));
                 }
             }
         }
@@ -741,16 +1131,22 @@ let Bowtie;
 
     /* Export Public Bowtie Properties */
     Bowtie.BINDER_TYPES = BINDER_TYPES;
-    Bowtie.WORD_TYPES = WORD_TYPES;
+    Bowtie.TOKEN_TYPES = TOKEN_TYPES;
 
     Bowtie.tie = tie;
-    Bowtie.parseTokenString = parseTokenString;
-    Bowtie.createBinder = createBinder;
+    Bowtie.Token = Token;
 
-    Bowtie.Word = Word;
+    //Bowtie.Word = Word;
     Bowtie.Binder = Binder;
     Bowtie.LiteralBinder = LiteralBinder;
     Bowtie.LookupBinder = LookupBinder;
+    Bowtie.BinderFactory = BinderFactory;
+
+    Bowtie.MemberLookupBinder = MemberLookupBinder;
+    Bowtie.FunctionLookupBinder = FunctionLookupBinder;
+    Bowtie.IndexLookupBinder = IndexLookupBinder;
+    Bowtie.PlusOperatorBinder = PlusOperatorBinder;
+
     Bowtie.Observable = Observable;
 })(Bowtie || (Bowtie = {}));
 

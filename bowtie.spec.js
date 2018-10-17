@@ -2,6 +2,7 @@
 const Bowtie = require("./bowtie");
 
 describe("Observable Behaviors", () => {
+
     it("should return new observable object from constructor is data is not observable", () => {
         let data = { name: "Superman", planet: "Krypton" };
         let result = new Bowtie.Observable(data);
@@ -17,125 +18,375 @@ describe("Observable Behaviors", () => {
 
         expect(result).toBe(obj);
     });
+
 });
 
 describe("Word Parser", () => {
 
-    it("should parse an empty string to null", () => {
-        let result = Bowtie.parseTokenString("");
-        expect(result).toBeNull();
+    it("should parse an empty string to undefined", () => {
+        let result = Array.from(Bowtie.Token.tokenize(""))[0];
+        expect(result).toBeUndefined();
     });
 
     it("should parse spaces to null", () => {
-        let result = Bowtie.parseTokenString(" ");
+        let result = Array.from(Bowtie.Token.tokenize(" "))[0];
         expect(result).toBeNull();
     });
 
     it("should parse a integer to a number result", () => {
-        let result = Bowtie.parseTokenString("451");
-        expect(result.type).toBe(Bowtie.WORD_TYPES.NUMBER);
-        expect(result.value).toBe("451");
+        let result = Array.from(Bowtie.Token.tokenize("451"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.NUMBER);
     });
 
-    it("should parse a float to a number result", () => {
-        let result = Bowtie.parseTokenString("45.1");
-        expect(result.type).toBe(Bowtie.WORD_TYPES.NUMBER);
-        expect(result.value).toBe("45.1");
+    it("should parse a '.' to a period result", () => {
+        let result = Array.from(Bowtie.Token.tokenize("."))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.PERIOD);
     });
 
-    it("should throw an error if a number contains more than one period", () => {
-        expect(() => Bowtie.parseTokenString("45.1.0")).toThrowError();
+    it("should parses 'name' to a LOOKUP result", () => {
+        let result = Array.from(Bowtie.Token.tokenize("name"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.LOOKUP);
     });
 
-    it("should parse a simple string to a lookup result", () => {
-        let result = Bowtie.parseTokenString("name");
-        expect(result.type).toBe(Bowtie.WORD_TYPES.MEMBER_LOOKUP);
-        expect(result.value).toBe("name");
+    it("should parse a quoted string to a STRING result", () => {
+        let result = Array.from(Bowtie.Token.tokenize("'name'"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.STRING);
     });
 
-    it("should parse a quoted string to a string result", () => {
-        let result = Bowtie.parseTokenString("'name'");
-        expect(result.type).toBe(Bowtie.WORD_TYPES.STRING);
-        expect(result.value).toBe("name");
+    it("should parse '[' to an INDEX_LOOKUP result", () => {
+        let result = Array.from(Bowtie.Token.tokenize("["))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.OPEN_BRACKET);
     });
 
-    it("should parse word true to a true result", () => {
-        let result = Bowtie.parseTokenString("true");
-        expect(result.type).toBe(Bowtie.WORD_TYPES.TRUE);
-        expect(result.value).toBe("true");
+    it("should parse ']' to an INDEX_CLOSE result", () => {
+        let result = Array.from(Bowtie.Token.tokenize("]"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.CLOSE_BRACKET);
     });
 
-    it("should parse word false to a false result", () => {
-        let result = Bowtie.parseTokenString("false");
-        expect(result.type).toBe(Bowtie.WORD_TYPES.FALSE);
-        expect(result.value).toBe("false");
+    it("should parse '(' to a GROUP_OPEN result", () => {
+        let result = Array.from(Bowtie.Token.tokenize("("))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.OPEN_PAREN);
     });
 
-    it("should parse word null to a null result", () => {
-        let result = Bowtie.parseTokenString("null");
-        expect(result.type).toBe(Bowtie.WORD_TYPES.NULL);
-        expect(result.value).toBe("null");
+    it("should parse ')' to a GROUP_CLOSE result", () => {
+        let result = Array.from(Bowtie.Token.tokenize(")"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.CLOSE_PAREN);
     });
 
-    it("should parse '.' to a member lookup result", () => {
-        let result = Bowtie.parseTokenString(".");
-        expect(result.type).toBe(Bowtie.WORD_TYPES.MEMBER_LOOKUP);
-        expect(result.value).toBe(".");
+    it("should parse '+' to a plus OPERATOR", () => {
+        let result = Array.from(Bowtie.Token.tokenize("+"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.OPERATOR);
     });
 
-    it("should parse 'test(' to a function open", () => {
-        let result = Bowtie.parseTokenString("test(");
-        expect(result.type).toBe(Bowtie.WORD_TYPES.FUNCTION_LOOKUP);
-        expect(result.value).toBe("test(");
+    it("should parse '-' to a minus OPERATOR", () => {
+        let result = Array.from(Bowtie.Token.tokenize("-"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.OPERATOR);
+    });
+
+    it("should parse '!' to a minus OPERATOR", () => {
+        let result = Array.from(Bowtie.Token.tokenize("!"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.OPERATOR);
+    });
+
+    it("should parse '/' to a divide OPERATOR", () => {
+        let result = Array.from(Bowtie.Token.tokenize("/"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.OPERATOR);
+    });
+
+    it("should parse '*' to a multiply OPERATOR", () => {
+        let result = Array.from(Bowtie.Token.tokenize("*"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.OPERATOR);
+    });
+
+    it("should parse '^' to a power OPERATOR", () => {
+        let result = Array.from(Bowtie.Token.tokenize("^"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.OPERATOR);
+    });
+
+    it("should parse '&' to an and OPERATOR", () => {
+        let result = Array.from(Bowtie.Token.tokenize("&"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.OPERATOR);
+    });
+
+    it("should parse '|' to an and OPERATOR", () => {
+        let result = Array.from(Bowtie.Token.tokenize("|"))[0];
+        expect(result.type).toBe(Bowtie.TOKEN_TYPES.OPERATOR);
     });
 });
 
 describe("Word Binder", () => {
-    it("should throw an error if none type result passed in", () => {
-        expect(() => Bowtie.createBinder({ type: Bowtie.WORD_TYPES.NONE, next: null, prev: null })).toThrowError();
-    });
 
-    it("should return a LiteralBinder with null value from null word", () => {
-        let binder = Bowtie.createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.NULL, "null"));
-        expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
-        expect(binder.value).toBeNull();
-    });
+    // it("should throw an error if none type result passed in", () => {
+    //     expect(() => new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.NONE, null))).toThrowError();
+    // });
 
-    it("should return a LiteralBinder with true value from true word", () => {
-        let binder = Bowtie.createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.TRUE, "true"));
-        expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
-        expect(binder.value).toBe(true);
-    });
+    // it("should return a LiteralBinder with null value from null word", () => {
+    //     let binder = new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.NULL, "null"));
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
+    //     expect(binder.value).toBeNull();
+    // });
 
-    it("should return a LiteralBinder with false value from false word", () => {
-        let binder = Bowtie.createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.FALSE, "false"));
-        expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
-        expect(binder.value).toBe(false);
-    });
+    // it("should return a LiteralBinder with true value from true word", () => {
+    //     let binder = new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.TRUE, "true"));
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
+    //     expect(binder.value).toBe(true);
+    // });
 
-    it("should return a LiteralBinder with number value from number word", () => {
-        let binder = Bowtie.createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "451"));
-        expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
-        expect(binder.value).toBe(451);
-    });
+    // it("should return a LiteralBinder with false value from false word", () => {
+    //     let binder = new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.FALSE, "false"));
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
+    //     expect(binder.value).toBe(false);
+    // });
 
-    it("should return a LiteralBinder with number value from float word", () => {
-        let binder = Bowtie.createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "45.1"));
-        expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
-        expect(binder.value).toBe(45.1);
-    });
+    // it("should return a LiteralBinder with number value from number word", () => {
+    //     let binder = new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "451"));
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
+    //     expect(binder.value).toBe(451);
+    // });
 
-    it("should return a LiteralBinder with string value from string word", () => {
-        let binder = Bowtie.createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.STRING, "Looksee"));
-        expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
-        expect(binder.value).toBe("Looksee");
-    });
+    // it("should return a LiteralBinder with number value from float word", () => {
+    //     let binder = new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "45.1"));
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
+    //     expect(binder.value).toBe(45.1);
+    // });
 
-    it("should return a LookupBinder with from a lookup word", () => {
-        let binder = Bowtie.createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.LOOKUP, "name"));
-        expect(binder.type).toBe(Bowtie.BINDER_TYPES.LOOKUP);
-        expect(binder.value).toBe("name");
-    });
+    // it("should return a LiteralBinder with string value from string word", () => {
+    //     let binder = new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.STRING, "Looksee"));
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
+    //     expect(binder.value).toBe("Looksee");
+    // });
+
+    // it("should return a LookupBinder with from a lookup word", () => {
+    //     let binder = new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.MEMBER_LOOKUP, "name"));
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.MEMBER_LOOKUP);
+    //     expect(binder.value).toBe("name");
+    // });
+
+    // it("should throw an error if unclosed function passed in", () => {
+    //     expect(() => new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.FUNCTION_LOOKUP, "floor"))).toThrowError();
+    // });
+
+    // it("should throw an error if function close is passed in alone", () => {
+    //     expect(() => new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.FUNCTION_CLOSE, ""))).toThrowError();
+    // });
+
+    // it("should return a FunctionLookupBinder from a function word string", () => {
+    //     let openWord = new Bowtie.Word(Bowtie.WORD_TYPES.FUNCTION_LOOKUP, "floor");
+    //     let closeWord = new Bowtie.Word(Bowtie.WORD_TYPES.GROUP_CLOSE, "", openWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(openWord);
+    //     expect(binder instanceof Bowtie.FunctionLookupBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.FUNCTION_LOOKUP);
+    //     expect(binder.value).toBe("floor");
+    // });
+
+    // it("should throw an error if unclosed indexer passed in", () => {
+    //     expect(() => new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.INDEX_LOOKUP, "floor"))).toThrowError();
+    // });
+
+    // it("should throw an error if index close is passed in alone", () => {
+    //     expect(() => new Bowtie.BinderFactory().createBinder(new Bowtie.Word(Bowtie.WORD_TYPES.INDEX_CLOSE, ""))).toThrowError();
+    // });
+
+    // it("should return a IndexLookupBinder from a index word string", () => {
+    //     let openWord = new Bowtie.Word(Bowtie.WORD_TYPES.INDEX_LOOKUP, "floor");
+    //     let indexWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3", openWord);
+    //     let closeWord = new Bowtie.Word(Bowtie.WORD_TYPES.INDEX_CLOSE, "", indexWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(openWord);
+    //     expect(binder instanceof Bowtie.IndexLookupBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.INDEX_LOOKUP);
+    //     expect(binder.value).toBe("floor");
+    // });
+
+    // it("should return a GroupBinder from a grouped word string", () => {
+    //     let openWord = new Bowtie.Word(Bowtie.WORD_TYPES.GROUP_OPEN, "");
+    //     let indexWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3", openWord);
+    //     let closeWord = new Bowtie.Word(Bowtie.WORD_TYPES.GROUP_CLOSE, "", indexWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(openWord);
+    //     expect(binder instanceof Bowtie.GroupBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.GROUP);
+    //     expect(binder.value).toBe("floor");
+    // });
+
+    // it("should throw an error if only left side is passed in from a binary plus string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "+", leftWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(leftWord)).toThrowError();
+    // });
+
+    // it("should throw an error if only right side is passed in from a binary plus string", () => {
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "+");
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(operatorWord)).toThrowError();
+    // });
+
+    // it("should return a PlusBinder with from an operator string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "+", leftWord);
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(leftWord);
+
+    //     expect(binder instanceof Bowtie.PlusOperatorBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.BINARY_OPERATOR);
+    //     expect(binder.value).toBe("+");
+    // });
+
+    // it("should throw an error if only left side is passed in from a binary minus string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "-", leftWord);
+    //     expect(() => Bowtie.createBinder(leftWord)).toThrowError();
+    // });
+
+    // it("should return a NegateBinder with from an operator string", () => {
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "-");
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(operatorWord);
+
+    //     expect(binder instanceof Bowtie.NegateOperatorBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.UNARY_OPERATOR);
+    //     expect(binder.value).toBe("-");
+    // });
+
+    // it("should return a MinusBinder with from an operator string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "-", leftWord);
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(leftWord);
+
+    //     expect(binder instanceof Bowtie.MinusOperatorBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.BINARY_OPERATOR);
+    //     expect(binder.value).toBe("-");
+    // });
+
+    // it("should throw an error if only left side is passed in from a binary multiply string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "*", leftWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(leftWord)).toThrowError();
+    // });
+
+    // it("should throw an error if only right side is passed in from a binary multiply string", () => {
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "*");
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(operatorWord)).toThrowError();
+    // });
+
+    // it("should return a MultiplyBinder with from an operator string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "*", leftWord);
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(leftWord);
+
+    //     expect(binder instanceof Bowtie.MultiplyOperatorBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.BINARY_OPERATOR);
+    //     expect(binder.value).toBe("*");
+    // });
+
+    // it("should throw an error if only left side is passed in from a binary divide string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "/", leftWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(leftWord)).toThrowError();
+    // });
+
+    // it("should throw an error if only right side is passed in from a binary divide string", () => {
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "/");
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(operatorWord)).toThrowError();
+    // });
+
+    // it("should return a DivideBinder with from an operator string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "/", leftWord);
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(leftWord);
+
+    //     expect(binder instanceof Bowtie.DivindeOperatorBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.BINARY_OPERATOR);
+    //     expect(binder.value).toBe("/");
+    // });
+
+    // it("should throw an error if only left side is passed in from a binary power string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "^", leftWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(leftWord)).toThrowError();
+    // });
+
+    // it("should throw an error if only right side is passed in from a binary power string", () => {
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "^");
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(operatorWord)).toThrowError();
+    // });
+
+    // it("should return a PowerBinder with from an operator string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "^", leftWord);
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(leftWord);
+
+    //     expect(binder instanceof Bowtie.PowerOperatorBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.BINARY_OPERATOR);
+    //     expect(binder.value).toBe("^");
+    // });
+
+    // it("should throw an error if only left side is passed in from a binary and string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "&", leftWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(leftWord)).toThrowError();
+    // });
+
+    // it("should throw an error if only right side is passed in from a binary and string", () => {
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "&");
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(operatorWord)).toThrowError();
+    // });
+
+    // it("should return a AndBinder with from an operator string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "&", leftWord);
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(leftWord);
+
+    //     expect(binder instanceof Bowtie.AndOperatorBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.BINARY_OPERATOR);
+    //     expect(binder.value).toBe("&");
+    // });
+
+    // it("should throw an error if only left side is passed in from a binary or string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "|", leftWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(leftWord)).toThrowError();
+    // });
+
+    // it("should throw an error if only right side is passed in from a binary or string", () => {
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "|");
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(operatorWord)).toThrowError();
+    // });
+
+    // it("should return a OrBinder with from an operator string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "|", leftWord);
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(leftWord);
+
+    //     expect(binder instanceof Bowtie.OrOperatorBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.BINARY_OPERATOR);
+    //     expect(binder.value).toBe("|");
+    // });
+
+    // it("should throw an error if only left side is passed in from a binary not string", () => {
+    //     let leftWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "3");
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "!", leftWord);
+    //     expect(() => new Bowtie.BinderFactory().createBinder(leftWord)).toThrowError();
+    // });
+
+    // it("should return a NotBinder with from an operator string", () => {
+    //     let operatorWord = new Bowtie.Word(Bowtie.WORD_TYPES.OPERATOR, "!");
+    //     let rightWord = new Bowtie.Word(Bowtie.WORD_TYPES.NUMBER, "2", operatorWord);
+    //     let binder = new Bowtie.BinderFactory().createBinder(operatorWord);
+
+    //     expect(binder instanceof Bowtie.NotOperatorBinder).toBeTruthy();
+    //     expect(binder.type).toBe(Bowtie.BINDER_TYPES.UNARY_OPERATOR);
+    //     expect(binder.value).toBe("!");
+    // });
 
 });
 
@@ -161,7 +412,7 @@ describe("Binding Behaviors", () => {
 
     it("LookupBinder should bind lookup to appropriate field", () => {
         let data = new Bowtie.Observable({ "name": "Superman" });
-        let binder = new Bowtie.LookupBinder("name");
+        let binder = new Bowtie.MemberLookupBinder("name");
         let element = new ElementMock();
 
         binder.bind(data, element, "value");
@@ -171,7 +422,7 @@ describe("Binding Behaviors", () => {
 
     it("LookupBinder updates target when source is updated", () => {
         let data = new Bowtie.Observable({ "name": "Superman" });
-        let binder = new Bowtie.LookupBinder("name");
+        let binder = new Bowtie.MemberLookupBinder("name");
         let element = new ElementMock();
 
         binder.bind(data, element, "value");

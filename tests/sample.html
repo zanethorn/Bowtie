@@ -28,6 +28,10 @@
         </div>
     </div>
 
+    <div>
+        <button data-bind-onclick="alert()">Show Alert</button>
+    </div>
+
 
     <script type="text/javascript" src="../bowtie.js"></script>
     <script type="text/javascript">
@@ -38,7 +42,10 @@
                 "name": "Krypton",
                 "status": "Destroyed"
             },
-            "weaknesses": "Kryptonite"
+            "weaknesses": "Kryptonite",
+            "alert": () => {
+                alert("Alert!");
+            }
         }
 
         document.addEventListener("DOMContentLoaded", () => Bowtie.tie(data, document.body));
