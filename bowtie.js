@@ -12,13 +12,13 @@ if (!String.prototype.format) {
      * Formats a string using {n} format syntax and returns a new string
      * @param {*} args A list of arguments to inject into the string
      */
-    String.prototype.format = function(...args) {
-      return this.replace(/{(\d+)}/g, function(match, number) { 
-        return typeof args[number] != 'undefined'
-          ? args[number]
-          : match
-        ;
-      });
+    String.prototype.format = function (...args) {
+        return this.replace(/{(\d+)}/g, function (match, number) {
+            return typeof args[number] != 'undefined'
+                ? args[number]
+                : match
+                ;
+        });
     };
 }
 
@@ -36,10 +36,11 @@ var Bowtie;
      */
     const ERRORS = {
         UNRECOGNIZED_SYMBOL: "Unrecognized or invalid symbol '{1}' at index {0}.",
-        UNTERMINATED_STRING_LITERAL: "Unterminated string literal."
+        UNTERMINATED_STRING_LITERAL: "Unterminated string literal.",
+        INVALID_SYNTAX: "Invalid Syntax '{0}' near index {1}."
     };
     /* lock down object to modifications */
-    Object.freeze(ERRORS); 
+    Object.freeze(ERRORS);
 
     /**
      * Enumeration representing the possible "types" of a character 
@@ -60,7 +61,7 @@ var Bowtie;
         CHARACTER_TYPES[CHARACTER_TYPES["OPERATOR"] = 10] = "OPERATOR";
     })(CHARACTER_TYPES);
     /* lock down object to modifications */
-    Object.freeze(CHARACTER_TYPES); 
+    Object.freeze(CHARACTER_TYPES);
 
     /**
      * A mapping from characters to character types.  All defined characters should be
@@ -167,22 +168,34 @@ var Bowtie;
         TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.PERIOD]] = CHARACTER_TYPES.PERIOD] = CHARACTER_TYPES[CHARACTER_TYPES.PERIOD];
         TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.COMMA]] = CHARACTER_TYPES.COMMA] = CHARACTER_TYPES[CHARACTER_TYPES.COMMA];
         TOKEN_TYPES[TOKEN_TYPES[CHARACTER_TYPES[CHARACTER_TYPES.OPERATOR]] = CHARACTER_TYPES.OPERATOR] = CHARACTER_TYPES[CHARACTER_TYPES.OPERATOR];
+
+        TOKEN_TYPES["length"] = TOKEN_TYPES.OPERATOR + 1;
     })(TOKEN_TYPES);
     Object.freeze(TOKEN_TYPES);
 
+    const PARSER_BEHAVIOR = {};
+    (function (PARSER_BEHAVIOR) {
+        PARSER_BEHAVIOR[PARSER_BEHAVIOR["ERROR"] = 0] = "ERROR";
+        PARSER_BEHAVIOR[PARSER_BEHAVIOR["SHIFT"] = 1] = "SHIFT";
+        PARSER_BEHAVIOR[PARSER_BEHAVIOR["REDUCE"] = 2] = "REDUCE";
+        PARSER_BEHAVIOR[PARSER_BEHAVIOR["STOP"] = 3] = "STOP";
 
-    class ParseState {
-        constructor(state, inputIndex, length) {
-            this.state = state;
-            this.inputIndex = inputIndex;
-            this.length = length;
-        }
-    }
+        PARSER_BEHAVIOR.length = PARSER_BEHAVIOR["STOP"] + 1;
+    })(PARSER_BEHAVIOR);
+    Object.freeze(PARSER_BEHAVIOR);
 
-    const LR_TABLE = [
-        []
-    ];
+    const PARSER_STATE_INDEX = {};
+    (function (PARSER_STATE_INDEX) {
+        PARSER_STATE_INDEX[PARSER_STATE_INDEX["NEW"] = 0] = "NEW";
+        PARSER_STATE_INDEX[PARSER_STATE_INDEX["VALUE"] = 1] = "VALUE";
+        PARSER_STATE_INDEX[PARSER_STATE_INDEX["UNARY_OR_BINARY"] = 2] = "UNARY_OR_BINARY";
+        PARSER_STATE_INDEX[PARSER_STATE_INDEX["UNARY"] = 2] = "UNARY";
+        PARSER_STATE_INDEX[PARSER_STATE_INDEX["UBINARY"] = 3] = "BINARY";
+        PARSER_STATE_INDEX[PARSER_STATE_INDEX["EOF"] = 4] = "EOF";
 
+        PARSER_STATE_INDEX["length"] = PARSER_STATE_INDEX.EOF + 1;
+    })(PARSER_STATE_INDEX);
+    Object.freeze(PARSER_STATE_INDEX);
 
     const BINDER_TYPES = {
         NONE: 0,
@@ -209,10 +222,15 @@ var Bowtie;
          * @param {Integer} startPtr The start index of the slice or substring
          * @param {Integer} length The length of the slice or substring
          */
-        constructor(type, startPtr, length) {
+        constructor(type, input, startPtr, length) {
             this.type = type;
+            this.input = input;
             this.startPtr = startPtr;
             this.length = length;
+        }
+
+        get value() {
+            return this.input.slice(this.startPtr, this.startPtr + this.length);
         }
 
         /**
@@ -241,7 +259,7 @@ var Bowtie;
                     /* Typically this means whitespace characters, or others we want to ignore */
                     case CHARACTER_TYPES.NONE:
                         if (tokenType !== TOKEN_TYPES.NONE) {
-                            yield new Token(tokenType, startPtr, endPtr - startPtr);
+                            yield new Token(tokenType, input, startPtr, endPtr - startPtr);
                             tokenType = TOKEN_TYPES.NONE;
                         }
                         startPtr += endPtr + 1;
@@ -250,7 +268,7 @@ var Bowtie;
                     /* Starts or end a string literal */
                     case CHARACTER_TYPES.QUOTE:
                         if (tokenType === TOKEN_TYPES.STRING) {
-                            yield new Token(tokenType, startPtr, endPtr - startPtr);
+                            yield new Token(tokenType, input, startPtr, endPtr - startPtr);
                             tokenType = TOKEN_TYPES.NONE;
                         }
                         else {
@@ -276,7 +294,7 @@ var Bowtie;
                     /* we are dealing with some type of symbol, like a period or binary operator */
                     default:
                         if (tokenType !== TOKEN_TYPES.NONE) {
-                            yield new Token(tokenType, startPtr, endPtr - startPtr);
+                            yield new Token(tokenType, input, startPtr, endPtr - startPtr);
                             tokenType = TOKEN_TYPES.NONE;
                         }
                         yield new Token(charType, endPtr, 1);
@@ -288,13 +306,50 @@ var Bowtie;
             }
 
             /* close out any open token */
-            if (tokenType !== TOKEN_TYPES.STRING) {
-                throw new Error(UNTERMINATED_STRING_LITERAL);
+            if (tokenType === TOKEN_TYPES.STRING) {
+                throw new Error(ERRORS.UNTERMINATED_STRING_LITERAL);
             }
             else if (tokenType !== TOKEN_TYPES.NONE) {
-                yield new Token(tokenType, startPtr, endPtr - startPtr);
+                yield new Token(tokenType, input, startPtr, endPtr - startPtr);
             }
-            return;
+            return new Token(TOKEN_TYPES.NONE, undefined, -1, 0);
+        }
+    }
+
+    class ParserCommand {
+        constructor(behavior, binderType, gotoIndex) {
+            this.behavior = behavior;
+            this.binderType = binderType;
+            //this.process = process || ((current, previous) => {throw new Error(ERRORS.INVALID_SYNTAX.format(current.value, current.startPtr));});
+            this.gotoIndex = gotoIndex || 0;
+        }
+    }
+
+    const PARSER_ERROR = new ParserCommand(PARSER_BEHAVIOR.ERROR);
+    Object.freeze(PARSER_ERROR);
+
+    class ParserState {
+        constructor(index) {
+            this.index = index;
+            for (let i = 0; i < TOKEN_TYPES.length; i++) {
+                this[i] = PARSER_ERROR;
+            }
+        }
+    }
+
+    const PARSE_TABLE = [];
+    for (let i = 0; i < PARSER_STATE_INDEX.length; i++) {
+        PARSE_TABLE[i] = new ParserState(i);
+    }
+
+    PARSE_TABLE[PARSER_STATE_INDEX.NEW][TOKEN_TYPES.NUMBER] = new ParserCommand(PARSER_BEHAVIOR.SHIFT, BINDER_TYPES.LITERAL, PARSER_STATE_INDEX.VALUE);
+
+    Object.freeze(PARSE_TABLE);
+
+    class ParserWord {
+        constructor(binderType, token) {
+            this.binderType = binderType;
+            this.token = token;
         }
     }
 
@@ -303,13 +358,46 @@ var Bowtie;
      */
     class Parser {
 
+        static parse_tokens(tokens) {
+            let stack = [];
+            let stateIndex = 0;
+
+            let itr = tokens.next();
+            let currentWord = itr.value;
+
+            let command = PARSE_TABLE[stateIndex][currentWord.type];
+
+            while (command.behavior !== PARSER_BEHAVIOR.STOP) {
+                stateIndex = command.gotoIndex;
+
+                switch (command.behavior) {
+
+                    case PARSER_BEHAVIOR.REDUCE:
+                        let previousWord = stack.pop();
+                        currentWord = command.process(currentWord, previousWord);
+                        break;
+
+                    case PARSER_BEHAVIOR.ERROR:
+                    case PARSER_BEHAVIOR.SHIFT:
+                    default:
+                        stack.push(command.process(currentWord));
+                        if (!itr.done) {
+                            itr = tokens.next();
+                            currentWord = itr.value;
+                        }
+                        break;
+                }
+
+                command = PARSE_TABLE[stateIndex][currentWord.type];
+            }
+        }
+
         /**
          * Parses Tokens into binding objects.
-         * @param {IterableIterator<Token>} input The token string to parse
+         * @param {string} input The token string to parse
          */
-        static parse(input){
-            let stack = [];
-            
+        static parse(input) {
+            this.parse_tokens(Token.tokenize(input));
         }
     }
 
@@ -341,20 +429,7 @@ var Bowtie;
             return this._value;
         }
 
-        getBindingValue(context) {
-            throw Error("Binding Error: Method is Abstract.");
-        }
 
-        /**
-         * Parses a chain of tokens into a single Binder object
-         * @param {*} tokens Token chain to bind, may be a generator
-         */
-        static parse(tokens) {
-            stack = []
-            for (let token of tokens) {
-
-            }
-        }
     }
 
     class PartialBinder extends Binder {
@@ -368,14 +443,8 @@ var Bowtie;
             super(BINDER_TYPES.LITERAL, value);
         }
 
-        bind(context, target, targetAttribute) {
-            ensureBindings(target);
-            target.setAttribute(targetAttribute, this.getBindingValue(context));
-            target.bindings.push(this);
-        }
-
-        getBindingValue(context) {
-            return this.value;
+        compile() {
+            return () => this.value();
         }
     }
 
@@ -929,6 +998,7 @@ var Bowtie;
     Bowtie.tie = tie;
 
     Bowtie.Token = Token;
+    Bowtie.Parser = Parser;
 
     //Bowtie.Word = Word;
     Bowtie.Binder = Binder;

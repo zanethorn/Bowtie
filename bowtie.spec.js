@@ -114,6 +114,65 @@ describe("Token.tokenize", () => {
     });
 });
 
+describe("Binder", () => {
+    it("should return a lamba that returns a literal value for a LITERAL binder", () => {
+        let binder = new Bowtie.LiteralBinder(451);
+        let result = result.compile();
+        expect(binder.value).toBe(451);
+        expect(result()).toBe(451);
+    });
+});
+
+describe("Parser", () => {
+    describe("parse_tokens", () => {
+
+        it("should parse a NUMBER token to a LITERAL binder with the correct number", () => {
+            let input = "451";
+            let string = [
+                new Bowtie.Token(Bowtie.TOKEN_TYPES.NUMBER, input, 0, input.length),
+                new Bowtie.Token(Bowtie.TOKEN_TYPES.NONE, undefined, -1, 0)
+            ][Symbol.iterator]();
+            let result = Bowtie.Parser.parse_tokens(string);
+            expect(result.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
+            expect(result.value).toBe(451);
+        });
+
+        it("should parse a LOOKUP token with the value of 'true' to a LITERAL binder with a value of true", () => {
+            let input = "true";
+            let string = [
+                new Bowtie.Token(Bowtie.TOKEN_TYPES.LOOKUP, input, 0, input.length),
+                new Bowtie.Token(Bowtie.TOKEN_TYPES.NONE, undefined, -1, 0)
+            ][Symbol.iterator]();
+            let result = Bowtie.Parser.parse_tokens(string);
+            expect(result.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
+            expect(result.value).toBe(true);
+        });
+
+        it("should parse a LOOKUP token with the value of 'false' to a LITERAL binder with a value of false", () => {
+            let input = "false";
+            let string = [
+                new Bowtie.Token(Bowtie.TOKEN_TYPES.LOOKUP, input, 0, input.length),
+                new Bowtie.Token(Bowtie.TOKEN_TYPES.NONE, undefined, -1, 0)
+            ][Symbol.iterator]();
+            let result = Bowtie.Parser.parse_tokens(string);
+            expect(result.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
+            expect(result.value).toBe(false);
+        });
+
+        it("should parse a LOOKUP token with the value of 'null' to a LITERAL binder with a value of null", () => {
+            let input = "null";
+            let string = [
+                new Bowtie.Token(Bowtie.TOKEN_TYPES.LOOKUP, input, 0, input.length),
+                new Bowtie.Token(Bowtie.TOKEN_TYPES.NONE, undefined, -1, 0)
+            ][Symbol.iterator]();
+            let result = Bowtie.Parser.parse_tokens(string);
+            expect(result.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
+            expect(result.value).toBeNull();
+        });
+
+    });
+});
+
 describe("Word Binder", () => {
 
     // it("should throw an error if none type result passed in", () => {
@@ -390,46 +449,46 @@ describe("Word Binder", () => {
 
 });
 
-describe("Binding Behaviors", () => {
+// describe("Binding Behaviors", () => {
 
-    class ElementMock {
-        getAttribute(key) {
-            return this[key];
-        }
-        setAttribute(key, value) {
-            this[key] = value;
-        }
-    }
+//     class ElementMock {
+//         getAttribute(key) {
+//             return this[key];
+//         }
+//         setAttribute(key, value) {
+//             this[key] = value;
+//         }
+//     }
 
-    it("LiteralBinder should bind number to appropriate field", () => {
-        let binder = new Bowtie.LiteralBinder(451);
-        let element = new ElementMock();
+//     it("LiteralBinder should bind number to appropriate field", () => {
+//         let binder = new Bowtie.LiteralBinder(451);
+//         let element = new ElementMock();
 
-        binder.bind(null, element, "value");
+//         binder.bind(null, element, "value");
 
-        expect(element.value).toBe(451);
-    });
+//         expect(element.value).toBe(451);
+//     });
 
-    it("LookupBinder should bind lookup to appropriate field", () => {
-        let data = new Bowtie.Observable({ "name": "Superman" });
-        let binder = new Bowtie.MemberLookupBinder("name");
-        let element = new ElementMock();
+//     it("LookupBinder should bind lookup to appropriate field", () => {
+//         let data = new Bowtie.Observable({ "name": "Superman" });
+//         let binder = new Bowtie.MemberLookupBinder("name");
+//         let element = new ElementMock();
 
-        binder.bind(data, element, "value");
+//         binder.bind(data, element, "value");
 
-        expect(element.value).toBe("Superman");
-    });
+//         expect(element.value).toBe("Superman");
+//     });
 
-    it("LookupBinder updates target when source is updated", () => {
-        let data = new Bowtie.Observable({ "name": "Superman" });
-        let binder = new Bowtie.MemberLookupBinder("name");
-        let element = new ElementMock();
+//     it("LookupBinder updates target when source is updated", () => {
+//         let data = new Bowtie.Observable({ "name": "Superman" });
+//         let binder = new Bowtie.MemberLookupBinder("name");
+//         let element = new ElementMock();
 
-        binder.bind(data, element, "value");
-        expect(element.value).toBe("Superman");
+//         binder.bind(data, element, "value");
+//         expect(element.value).toBe("Superman");
 
-        data.setAttribute("name", "Batman")
-        expect(element.value).toBe("Batman");
-    });
+//         data.setAttribute("name", "Batman")
+//         expect(element.value).toBe("Batman");
+//     });
 
-});
+// });
