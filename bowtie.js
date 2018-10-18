@@ -1,21 +1,49 @@
 "use strict";
+
+/* These are needed to ensure that 
 if (!window) {
     var window = { Element: function () { } };
 }
 var module = (module || undefined);
 
+/* Patch in string.format */
+if (!String.prototype.format) {
+    /**
+     * Formats a string using {n} format syntax and returns a new string
+     * @param {*} args A list of arguments to inject into the string
+     */
+    String.prototype.format = function(...args) {
+      return this.replace(/{(\d+)}/g, function(match, number) { 
+        return typeof args[number] != 'undefined'
+          ? args[number]
+          : match
+        ;
+      });
+    };
+}
+
+/**
+ * The Bowtie namespace
+ */
 var Bowtie;
 (function (Bowtie) {
+    /*************************************************************************
+     * Constants                                                             *
+     *************************************************************************/
 
     /**
      * Consolodate error messages into one location for ease of translation
      */
     const ERRORS = {
-        UNRECOGNIZED_SYMBOL: "Unrecognized or invalid symbol '{1}' at index {0}."
+        UNRECOGNIZED_SYMBOL: "Unrecognized or invalid symbol '{1}' at index {0}.",
+        UNTERMINATED_STRING_LITERAL: "Unterminated string literal."
     };
-    Object.freeze(ERRORS);
+    /* lock down object to modifications */
+    Object.freeze(ERRORS); 
 
-    /* Global Constants */
+    /**
+     * Enumeration representing the possible "types" of a character 
+     */
     const CHARACTER_TYPES = {};
     (function (CHARACTER_TYPES) {
         CHARACTER_TYPES[CHARACTER_TYPES["NONE"] = 0] = "NONE";
@@ -31,8 +59,13 @@ var Bowtie;
         CHARACTER_TYPES[CHARACTER_TYPES["COMMA"] = 9] = "COMMA";
         CHARACTER_TYPES[CHARACTER_TYPES["OPERATOR"] = 10] = "OPERATOR";
     })(CHARACTER_TYPES);
-    Object.freeze(CHARACTER_TYPES);
+    /* lock down object to modifications */
+    Object.freeze(CHARACTER_TYPES); 
 
+    /**
+     * A mapping from characters to character types.  All defined characters should be
+     * here.  If they are not in this list, Token.tokenize will throw an Error.
+     */
     const CHARACTER_MAP = {
         "a": CHARACTER_TYPES.LETTER,
         "b": CHARACTER_TYPES.LETTER,
@@ -97,10 +130,10 @@ var Bowtie;
         "8": CHARACTER_TYPES.NUMBER,
         "9": CHARACTER_TYPES.NUMBER,
         "0": CHARACTER_TYPES.NUMBER,
-        " ": CHARACTER_TYPES.WHITE_SPACE,
-        "\t": CHARACTER_TYPES.WHITE_SPACE,
-        "\n": CHARACTER_TYPES.WHITE_SPACE,
-        "\r": CHARACTER_TYPES.WHITE_SPACE,
+        " ": CHARACTER_TYPES.NONE,
+        "\t": CHARACTER_TYPES.NONE,
+        "\n": CHARACTER_TYPES.NONE,
+        "\r": CHARACTER_TYPES.NONE,
         ".": CHARACTER_TYPES.PERIOD,
         "(": CHARACTER_TYPES.OPEN_PAREN,
         ")": CHARACTER_TYPES.CLOSE_PAREN,
@@ -117,6 +150,7 @@ var Bowtie;
         "|": CHARACTER_TYPES.OPERATOR,
         "!": CHARACTER_TYPES.OPERATOR,
     };
+    /* lock down object to modifications */
     Object.freeze(CHARACTER_MAP);
 
     const TOKEN_TYPES = {};
@@ -165,26 +199,46 @@ var Bowtie;
 
     }
 
+    /**
+     * Represents a segment of a string with a distinct semantic meaning.
+     */
     class Token {
+        /**
+         * Creates a new instance of Bowtie.Token
+         * @param {TOKEN_TYPES} type Indicates what the type of value the token represents
+         * @param {Integer} startPtr The start index of the slice or substring
+         * @param {Integer} length The length of the slice or substring
+         */
         constructor(type, startPtr, length) {
             this.type = type;
             this.startPtr = startPtr;
             this.length = length;
         }
 
+        /**
+         * Analyzes an input string and converts it into tokens.  Returns results as a generator
+         * @param {string} input The string to be converted
+         */
         static *tokenize(input) {
             let startPtr = 0;
             let endPtr = 0;
             let tokenType = TOKEN_TYPES.NONE;
 
+            /* Keep on until the end of the string */
             while (endPtr < input.length) {
                 let char = input[endPtr];
+                /* Get the type of character we are dealing with */
                 let charType = CHARACTER_MAP[char];
 
                 switch (charType) {
+                    /* This is an unknown or invalid character */
                     case undefined:
-                        throw new Error(String.format(ERRORS.UNRECOGNIZED_SYMBOL, char, endPtr));
+                        /* if we are dealing with a string literal, anything goes, else, throw an error */
+                        if (tokenType !== TOKEN_TYPES.STRING) {
+                            throw new Error(ERRORS.UNRECOGNIZED_SYMBOL.format(char, endPtr));
+                        }
 
+                    /* Typically this means whitespace characters, or others we want to ignore */
                     case CHARACTER_TYPES.NONE:
                         if (tokenType !== TOKEN_TYPES.NONE) {
                             yield new Token(tokenType, startPtr, endPtr - startPtr);
@@ -193,6 +247,7 @@ var Bowtie;
                         startPtr += endPtr + 1;
                         break;
 
+                    /* Starts or end a string literal */
                     case CHARACTER_TYPES.QUOTE:
                         if (tokenType === TOKEN_TYPES.STRING) {
                             yield new Token(tokenType, startPtr, endPtr - startPtr);
@@ -204,18 +259,21 @@ var Bowtie;
                         startPtr += endPtr + 1;
                         break;
 
+                    /* If we are at the start of a new token, a number is a distict literal, else, it should be part of a lookup string */
                     case CHARACTER_TYPES.NUMBER:
                         if (tokenType === TOKEN_TYPES.NONE) {
                             tokenType = TOKEN_TYPES.NUMBER;
                         }
                         break;
 
+                    /* start a lookup string */
                     case CHARACTER_TYPES.LETTER:
                         if (tokenType === TOKEN_TYPES.NONE) {
                             tokenType = TOKEN_TYPES.LOOKUP;
                         }
                         break;
 
+                    /* we are dealing with some type of symbol, like a period or binary operator */
                     default:
                         if (tokenType !== TOKEN_TYPES.NONE) {
                             yield new Token(tokenType, startPtr, endPtr - startPtr);
@@ -229,25 +287,31 @@ var Bowtie;
                 endPtr += 1;
             }
 
-            if (tokenType !== TOKEN_TYPES.NONE) {
+            /* close out any open token */
+            if (tokenType !== TOKEN_TYPES.STRING) {
+                throw new Error(UNTERMINATED_STRING_LITERAL);
+            }
+            else if (tokenType !== TOKEN_TYPES.NONE) {
                 yield new Token(tokenType, startPtr, endPtr - startPtr);
             }
-
+            return;
         }
-
-
     }
 
-    function parse_word(input) {
-        stack = []
+    /**
+     * Handles the semantic aspects of parsing binder input
+     */
+    class Parser {
 
-
-        topOfStack = null;
-        nextInput = input;
-
-
-
-    };
+        /**
+         * Parses Tokens into binding objects.
+         * @param {IterableIterator<Token>} input The token string to parse
+         */
+        static parse(input){
+            let stack = [];
+            
+        }
+    }
 
     /* Public Classes */
 
@@ -279,6 +343,17 @@ var Bowtie;
 
         getBindingValue(context) {
             throw Error("Binding Error: Method is Abstract.");
+        }
+
+        /**
+         * Parses a chain of tokens into a single Binder object
+         * @param {*} tokens Token chain to bind, may be a generator
+         */
+        static parse(tokens) {
+            stack = []
+            for (let token of tokens) {
+
+            }
         }
     }
 
@@ -770,288 +845,6 @@ var Bowtie;
         }
     }
 
-    /**
-     * Parses a string into a chain of tokens
-     * @param {} input 
-     */
-    function parseTokenString(input) {
-        let wordStartIndex = 0;
-        let currentIndex = 0;
-        //let lastCharType = CHARACTER_TYPES.NONE;
-        let wordType = WORD_TYPES.NONE;
-        let firstWord = null;
-        let lastWord = null;
-        let numberHasPeriod = false;
-
-        let testWord = (charType) => {
-            let handler = handlers[wordType];
-            if (handler === undefined) {
-                throw new Error(`Handler undefined for word type '${wordType}'`);
-            }
-
-            let emmitToken = handler(charType);
-
-            if (emmitToken) {
-                createWord();
-            }
-        };
-
-        let createWord = () => {
-            if (input[wordStartIndex] === ".") {
-                wordStartIndex += 1;
-            }
-
-            let value = input.slice(wordStartIndex, currentIndex);
-            if (value === "true") {
-                wordType = WORD_TYPES.TRUE;
-            }
-            else if (value === "false") {
-                wordType = WORD_TYPES.FALSE;
-            }
-            else if (value === "null") {
-                wordType = WORD_TYPES.NULL;
-            }
-
-            let word = new Word(wordType, value, lastWord);
-
-            if (firstWord === null) {
-                firstWord = word;
-            }
-
-            lastWord = word;
-            wordStartIndex = currentIndex
-            wordType = WORD_TYPES.NONE;
-        }
-
-        let startNumber = () => {
-            numberHasPeriod = false;
-            wordType = WORD_TYPES.NUMBER;
-            return false;
-        }
-
-        let handleNone = (charType) => {
-            switch (charType) {
-                case CHARACTER_TYPES.NONE:
-                    wordType = WORD_TYPES.NONE;
-                    break;
-                case CHARACTER_TYPES.LETTER:
-                    wordType = WORD_TYPES.MEMBER_LOOKUP;
-                    break;
-                case CHARACTER_TYPES.NUMBER:
-                    return startNumber();
-                case CHARACTER_TYPES.WHITE_SPACE:
-                    wordType = WORD_TYPES.NONE;
-                    wordStartIndex += 1;
-                    break;
-                case CHARACTER_TYPES.OPEN_PAREN:
-                    wordType = WORD_TYPES.GROUP_OPEN;
-                    wordStartIndex += 1;
-                    return true;
-                case CHARACTER_TYPES.CLOSE_PAREN:
-                    wordType = WORD_TYPES.GROUP_CLOSE;
-                    wordStartIndex += 1;
-                    return true;
-                case CHARACTER_TYPES.OPEN_BRACKET:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.CLOSE_BRACKET:
-                    wordType = WORD_TYPES.INDEX_CLOSE;
-                    wordStartIndex += 1;
-                    return true;
-                case CHARACTER_TYPES.PERIOD:
-                    wordStartIndex += 1;
-                    wordType = WORD_TYPES.MEMBER_LOOKUP;
-                    break;
-                case CHARACTER_TYPES.COMMA:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.QUOTE:
-                    wordType = WORD_TYPES.STRING;
-                    wordStartIndex += 1;
-                    break;
-                case CHARACTER_TYPES.OPERATOR:
-                    wordType = WORD_TYPES.OPERATOR;
-                    switch (input[wordStartIndex]) {
-                        case "&":
-                        case "|":
-                            return false;
-                        default:
-                            currentIndex += 1;
-                            return true;
-                    }
-                    break;
-                default:
-                    throw new Error(`Unknown Character type ${charType}`);
-            }
-            return false;
-        };
-
-        let handleNumber = (charType) => {
-            switch (charType) {
-                case CHARACTER_TYPES.NONE:
-                    return true; /* string has ended */
-                case CHARACTER_TYPES.LETTER:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.NUMBER:
-                    return false; /* Continuing to build number */
-                case CHARACTER_TYPES.WHITE_SPACE:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.OPEN_PAREN:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.CLOSE_PAREN:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.OPEN_BRACKET:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.CLOSE_BRACKET:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.PERIOD:
-                    if (numberHasPeriod) {
-                        throw new Error(`Parser Error: Invalid duplicate period in number at index ${currentIndex}`);
-                    }
-                    numberHasPeriod = true;
-                    return false; /* Continuing to build number */
-                case CHARACTER_TYPES.COMMA:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.QUOTE:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.OPERATOR:
-                    throw new Error("Not Implemented");
-                    break;
-                default:
-                    throw new Error(`Unknown Character type ${charType}`);
-            }
-        };
-
-        let handleString = (charType) => {
-            if (charType === CHARACTER_TYPES.QUOTE) {
-                return true;
-            }
-            else if (charType === CHARACTER_TYPES.NONE) {
-                throw new Error("Parser Error: Unterminated string literal.")
-            }
-            return false;
-        }
-
-        let handleTrue = (charType) => {
-            throw new Error("Parser Error: Method should never be called");
-        }
-
-        let handleFalse = (charType) => {
-            throw new Error("Parser Error: Method should never be called");
-        };
-
-        let handleNull = (charType) => {
-            throw new Error("Parser Error: Method should never be called");
-        };
-
-        let handleMemberLookup = (charType) => {
-            switch (charType) {
-                case CHARACTER_TYPES.LETTER:
-                case CHARACTER_TYPES.NUMBER:
-                    return false; /* Keep building word */
-                case CHARACTER_TYPES.PERIOD:
-                    if (wordStartIndex === currentIndex) {
-                        throw new Error(`Parser Error: Invalid character '${input[currentIndex]}' at index ${currentIndex}`);
-                    }
-                    return true;
-                case CHARACTER_TYPES.NONE:
-                case CHARACTER_TYPES.WHITE_SPACE:
-                case CHARACTER_TYPES.COMMA:
-                    return true;
-                case CHARACTER_TYPES.OPEN_PAREN:
-                    wordType = WORD_TYPES.FUNCTION_LOOKUP;
-                    return true; /* start parsing function parameters, if any */
-                case CHARACTER_TYPES.CLOSE_BRACKET:
-                case CHARACTER_TYPES.CLOSE_PAREN:
-                case CHARACTER_TYPES.UNKNOWN:
-                    throw new Error(`Parser Error: Invalid character '${input[currentIndex]}' at index ${currentIndex}`);
-                case CHARACTER_TYPES.OPEN_BRACKET:
-                    wordType = WORD_TYPES.INDEX_LOOKUP;
-                    return true; /* start parsing function parameters, if any */
-                case CHARACTER_TYPES.QUOTE:
-                    throw new Error("Not Implemented");
-                    break;
-                case CHARACTER_TYPES.OPERATOR:
-                    throw new Error("Not Implemented");
-                    break;
-                default:
-                    throw new Error(`Unknown Character type ${charType}`);
-            }
-            return false;
-        }
-
-        let handleFunctionLookup = (charType) => {
-            throw new Error("Parser Error: Method should never be called");
-        };
-
-        let handleIndexLookup = (charType) => {
-            throw new Error("Parser Error: Method should never be called");
-        };
-
-        let handleIndexClose = (charType) => {
-            throw new Error("Parser Error: Method should never be called");
-        };
-
-        let handleGroupOpen = (charType) => {
-            throw new Error("Parser Error: Method should never be called");
-        };
-
-        let handleGroupClose = (charType) => {
-            throw new Error("Parser Error: Method should never be called");
-        };
-
-        let handleOperator = (charType) => {
-            if (charType === CHARACTER_TYPES.OPERATOR) {
-                if (input[currentIndex] == input[wordStartIndex]) {
-                    return true;
-                }
-            }
-            throw new Error(`Parser Error: Invalid Syntax at ${currentIndex}`);
-        };
-
-        let handlers = [
-            handleNone,
-            handleNumber,
-            handleString,
-            handleTrue,
-            handleFalse,
-            handleNull,
-            handleMemberLookup,
-            handleFunctionLookup,
-            handleIndexLookup,
-            handleIndexClose,
-            handleGroupOpen,
-            handleGroupClose,
-            handleOperator
-        ];
-
-        while (currentIndex < input.length) {
-            let char = input[currentIndex];
-            let charType = CHARACTER_MAP[char];
-
-            if (charType === undefined) {
-                charType = CHARACTER_TYPES.UNKNOWN;
-            }
-
-            testWord(charType);
-
-            //lastCharType = charType;
-            currentIndex += 1;
-        }
-
-        testWord(CHARACTER_TYPES.NONE);
-
-        return firstWord;
-    }
-
     function createBindingFromString(input) {
         let words = parseTokenString(input);
         let factory = new BinderFactory();
@@ -1134,6 +927,7 @@ var Bowtie;
     Bowtie.TOKEN_TYPES = TOKEN_TYPES;
 
     Bowtie.tie = tie;
+
     Bowtie.Token = Token;
 
     //Bowtie.Word = Word;

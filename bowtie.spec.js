@@ -1,7 +1,7 @@
 
 const Bowtie = require("./bowtie");
 
-describe("Observable Behaviors", () => {
+describe("Observable ", () => {
 
     it("should return new observable object from constructor is data is not observable", () => {
         let data = { name: "Superman", planet: "Krypton" };
@@ -21,7 +21,7 @@ describe("Observable Behaviors", () => {
 
 });
 
-describe("Word Parser", () => {
+describe("Token.tokenize", () => {
 
     it("should parse an empty string to undefined", () => {
         let result = Array.from(Bowtie.Token.tokenize(""))[0];
@@ -30,7 +30,7 @@ describe("Word Parser", () => {
 
     it("should parse spaces to null", () => {
         let result = Array.from(Bowtie.Token.tokenize(" "))[0];
-        expect(result).toBeNull();
+        expect(result).toBeUndefined();
     });
 
     it("should parse a integer to a number result", () => {
