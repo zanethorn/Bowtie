@@ -117,7 +117,7 @@ describe("Token.tokenize", () => {
 describe("Binder", () => {
     it("should return a lamba that returns a literal value for a LITERAL binder", () => {
         let binder = new Bowtie.LiteralBinder(451);
-        let result = result.compile();
+        let result = binder.compile();
         expect(binder.value).toBe(451);
         expect(result()).toBe(451);
     });
@@ -133,41 +133,47 @@ describe("Parser", () => {
                 new Bowtie.Token(Bowtie.TOKEN_TYPES.NONE, undefined, -1, 0)
             ][Symbol.iterator]();
             let result = Bowtie.Parser.parse_tokens(string);
-            expect(result.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
-            expect(result.value).toBe(451);
+            expect(result.binderType).toBe(Bowtie.BINDER_TYPES.LITERAL);
         });
 
-        it("should parse a LOOKUP token with the value of 'true' to a LITERAL binder with a value of true", () => {
+        it("should parse a LOOKUP token with the value of 'true' to a LOOKUP binder with a value of true", () => {
             let input = "true";
             let string = [
                 new Bowtie.Token(Bowtie.TOKEN_TYPES.LOOKUP, input, 0, input.length),
                 new Bowtie.Token(Bowtie.TOKEN_TYPES.NONE, undefined, -1, 0)
             ][Symbol.iterator]();
             let result = Bowtie.Parser.parse_tokens(string);
-            expect(result.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
-            expect(result.value).toBe(true);
+            expect(result.type).toBe(Bowtie.BINDER_TYPES.LOOKUP);
         });
 
-        it("should parse a LOOKUP token with the value of 'false' to a LITERAL binder with a value of false", () => {
+        it("should parse a LOOKUP token with the value of 'false' to a LOOKUP binder with a value of false", () => {
             let input = "false";
             let string = [
                 new Bowtie.Token(Bowtie.TOKEN_TYPES.LOOKUP, input, 0, input.length),
                 new Bowtie.Token(Bowtie.TOKEN_TYPES.NONE, undefined, -1, 0)
             ][Symbol.iterator]();
             let result = Bowtie.Parser.parse_tokens(string);
-            expect(result.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
-            expect(result.value).toBe(false);
+            expect(result.type).toBe(Bowtie.BINDER_TYPES.LOOKUP);
         });
 
-        it("should parse a LOOKUP token with the value of 'null' to a LITERAL binder with a value of null", () => {
+        it("should parse a LOOKUP token with the value of 'null' to a LOOKUP binder with a value of null", () => {
             let input = "null";
             let string = [
                 new Bowtie.Token(Bowtie.TOKEN_TYPES.LOOKUP, input, 0, input.length),
                 new Bowtie.Token(Bowtie.TOKEN_TYPES.NONE, undefined, -1, 0)
             ][Symbol.iterator]();
             let result = Bowtie.Parser.parse_tokens(string);
-            expect(result.type).toBe(Bowtie.BINDER_TYPES.LITERAL);
-            expect(result.value).toBeNull();
+            expect(result.type).toBe(Bowtie.BINDER_TYPES.LOOKUP);
+        });
+
+        it("should parse a LOOKUP token with the value of 'null' to a LOOKUP binder with a value of null", () => {
+            let input = "null";
+            let string = [
+                new Bowtie.Token(Bowtie.TOKEN_TYPES.LOOKUP, input, 0, input.length),
+                new Bowtie.Token(Bowtie.TOKEN_TYPES.NONE, undefined, -1, 0)
+            ][Symbol.iterator]();
+            let result = Bowtie.Parser.parse_tokens(string);
+            expect(result.type).toBe(Bowtie.BINDER_TYPES.LOOKUP);
         });
 
     });

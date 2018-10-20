@@ -190,12 +190,14 @@ var Bowtie;
         PARSER_STATE_INDEX[PARSER_STATE_INDEX["VALUE"] = 1] = "VALUE";
         PARSER_STATE_INDEX[PARSER_STATE_INDEX["UNARY_OR_BINARY"] = 2] = "UNARY_OR_BINARY";
         PARSER_STATE_INDEX[PARSER_STATE_INDEX["UNARY"] = 2] = "UNARY";
-        PARSER_STATE_INDEX[PARSER_STATE_INDEX["UBINARY"] = 3] = "BINARY";
-        PARSER_STATE_INDEX[PARSER_STATE_INDEX["EOF"] = 4] = "EOF";
+        PARSER_STATE_INDEX[PARSER_STATE_INDEX["BINARY"] = 3] = "BINARY";
+        //PARSER_STATE_INDEX[PARSER_STATE_INDEX["EOF"] = 4] = "EOF";
 
-        PARSER_STATE_INDEX["length"] = PARSER_STATE_INDEX.EOF + 1;
+        PARSER_STATE_INDEX["length"] = PARSER_STATE_INDEX["BINARY"] + 1;
     })(PARSER_STATE_INDEX);
     Object.freeze(PARSER_STATE_INDEX);
+
+    const 
 
     const BINDER_TYPES = {
         NONE: 0,
@@ -317,10 +319,10 @@ var Bowtie;
     }
 
     class ParserCommand {
-        constructor(behavior, binderType, gotoIndex) {
+        constructor(behavior, binderType, gotoIndex, action) {
             this.behavior = behavior;
             this.binderType = binderType;
-            //this.process = process || ((current, previous) => {throw new Error(ERRORS.INVALID_SYNTAX.format(current.value, current.startPtr));});
+            this.action = action || ((current, previous) => { throw new Error(ERRORS.INVALID_SYNTAX.format(current.value, current.startPtr)); });
             this.gotoIndex = gotoIndex || 0;
         }
     }
@@ -342,14 +344,20 @@ var Bowtie;
         PARSE_TABLE[i] = new ParserState(i);
     }
 
+    PARSE_TABLE[PARSER_STATE_INDEX.NEW][TOKEN_TYPES.LOOKUP] = new ParserCommand(PARSER_BEHAVIOR.SHIFT, BINDER_TYPES.LOOKUP, PARSER_STATE_INDEX.VALUE);
     PARSE_TABLE[PARSER_STATE_INDEX.NEW][TOKEN_TYPES.NUMBER] = new ParserCommand(PARSER_BEHAVIOR.SHIFT, BINDER_TYPES.LITERAL, PARSER_STATE_INDEX.VALUE);
+
+
+    PARSE_TABLE[PARSER_STATE_INDEX.VALUE][TOKEN_TYPES.NONE] = new ParserCommand(PARSER_BEHAVIOR.STOP);
 
     Object.freeze(PARSE_TABLE);
 
     class ParserWord {
-        constructor(binderType, token) {
+        constructor(binderType, token, currentWord, previousWord) {
             this.binderType = binderType;
             this.token = token;
+            this.currentWord = currentWord;
+            this.previousWord = previousWord;
         }
     }
 
@@ -363,32 +371,36 @@ var Bowtie;
             let stateIndex = 0;
 
             let itr = tokens.next();
-            let currentWord = itr.value;
+            let token = itr.value;
+            let currentWord = null;
 
-            let command = PARSE_TABLE[stateIndex][currentWord.type];
-
-            while (command.behavior !== PARSER_BEHAVIOR.STOP) {
+            while (true) {
+                let command = PARSE_TABLE[stateIndex][token.type];
                 stateIndex = command.gotoIndex;
 
                 switch (command.behavior) {
 
-                    case PARSER_BEHAVIOR.REDUCE:
-                        let previousWord = stack.pop();
-                        currentWord = command.process(currentWord, previousWord);
-                        break;
-
-                    case PARSER_BEHAVIOR.ERROR:
                     case PARSER_BEHAVIOR.SHIFT:
-                    default:
-                        stack.push(command.process(currentWord));
+                        stack.push(currentWord);
+                        currentWord = new ParserWord(command.binderType, token, currentWord);
                         if (!itr.done) {
                             itr = tokens.next();
-                            currentWord = itr.value;
+                            token = itr.value;
                         }
                         break;
-                }
 
-                command = PARSE_TABLE[stateIndex][currentWord.type];
+                    case PARSER_BEHAVIOR.REDUCE:
+                        let previousWord = stack.pop();
+                        currentWord = new ParserWord(command.binderType, token, currentWord, previousWord);
+                        break;
+
+                    case PARSER_BEHAVIOR.STOP:
+                        return currentWord;
+
+                    case PARSER_BEHAVIOR.ERROR:
+                    default:
+                        throw new Error(ERRORS.INVALID_SYNTAX.format(token.value, token.startPtr));
+                }
             }
         }
 
@@ -399,6 +411,19 @@ var Bowtie;
         static parse(input) {
             this.parse_tokens(Token.tokenize(input));
         }
+    }
+
+    class Expression {
+
+        static build(word) {
+            switch (word.wordType) {
+                case 
+            }
+        }
+    }
+
+    class ExpressionBinder {
+
     }
 
     /* Public Classes */
@@ -444,7 +469,7 @@ var Bowtie;
         }
 
         compile() {
-            return () => this.value();
+            return ((ctx) => this.value);
         }
     }
 
